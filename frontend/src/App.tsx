@@ -23,10 +23,15 @@ function App() {
   >
     <BoardEditorView/>
   </Tabs.Item>
-  <Tabs.Item active={true} title="Piece Editor">
+  <Tabs.Item title={<div className='inline-flex'>Piece Editor<HelpModal text="Create pieces to put on your boards here. You can draw a custom image with the tools, create custom move sets, and even create custom moves!"/></div>}>
       <PieceEditor mouseDownState={mouseDownState}></PieceEditor>
   </Tabs.Item>
-  <Tabs.Item title="Game">
+  <Tabs.Item title={<div className='inline-flex'>Game<HelpModal 
+  text="Play chess! The rules for how each piece move can be seen by clicking on it.
+  The game ends when any one of your royal pieces are taken.
+  If a player cannot move, they lose.
+  There is no 3 fold repetition rule, players must agree to a draw.
+  "/></div>}>
     Game simulation content
   </Tabs.Item>
 </Tabs.Group>

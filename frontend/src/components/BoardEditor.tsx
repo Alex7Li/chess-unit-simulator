@@ -3,7 +3,7 @@ import { NAME_TO_PIECE, PIECES } from './definitions';
 import { BoardSetup, Piece } from './types';
 import _ from 'lodash'
 import PieceView from './PieceView';
-import HelpModal from './HelpModal';
+
 interface BoardEditorProps {
   boardSetup: BoardSetup
   setBoardSetup: React.Dispatch<React.SetStateAction<BoardSetup>>
@@ -61,7 +61,7 @@ const BoardEditor: FC<BoardEditorProps> = ({boardSetup, selectedPiece, setBoardS
         }
         setBoardSetup(newGrid);
           }
-          return <button className={grid_style} key={row * 17 + col} onMouseDown={handler_func}>
+          return <button className={grid_style} key={row * 15 + col} onMouseDown={handler_func}>
             {inner_element}
           </button>
         })

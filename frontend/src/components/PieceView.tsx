@@ -19,7 +19,7 @@ interface MovesViewProps {
 export const MovesView: FC<MovesViewProps> = ({ moveGrid, changeMoveGrid, selectedMoveName, mouseDownState }) => {
   const editable = (changeMoveGrid !== undefined) && (selectedMoveName !== undefined) && (mouseDownState !== undefined)
   return (
-    <div className="grid grid-cols-17 grid-rows-17 gap-x-0 w-85 h-85 border-gray-900 border-2 p-0 m-0">
+    <div className="grid grid-cols-15 grid-rows-15 gap-x-0 w-75 h-75 border-gray-900 border-2 p-0 m-0">
       {moveGrid.map((moveLine, row) => {
         return moveLine.map((moveName, col) => {
           const parity = (row + col) % 2 === 0 ? 'dark' : 'light';
@@ -32,7 +32,7 @@ export const MovesView: FC<MovesViewProps> = ({ moveGrid, changeMoveGrid, select
             grid_style += " bg-grid_dark hover:bg-green-100 focus:bg-green-300"
           }
           let inner_element = <></>
-          if (row == 8 && col == 8) {
+          if (row == 7 && col == 7) {
             inner_element = <div className="rounded-full"><FaceSmileIcon /></div>
           }
           if (moveName) {
@@ -41,7 +41,7 @@ export const MovesView: FC<MovesViewProps> = ({ moveGrid, changeMoveGrid, select
           let handler_func:  React.MouseEventHandler<HTMLButtonElement> | undefined = undefined;
           if (editable) {
             handler_func = (e) => {
-              if (row == 8 && col == 8) {
+              if (row == 7 && col == 7) {
                 return;
               }
               // Check that we are reacting to a mousedown or a mouseenter while
@@ -52,16 +52,16 @@ export const MovesView: FC<MovesViewProps> = ({ moveGrid, changeMoveGrid, select
                 // the mouse is holding down the right click button.
                 if (selectedMoveName == 'cancel' || mouseDownState == 2 || ("mousedown" && e.button == 2)) {
                   newGrid[row][col] = null;
-                  newGrid[row][17 - col - 1] = null;
+                  newGrid[row][15 - col - 1] = null;
                 } else {
                   newGrid[row][col] = selectedMoveName;
-                  newGrid[row][17 - col - 1] = selectedMoveName;
+                  newGrid[row][15 - col - 1] = selectedMoveName;
                 }
                 changeMoveGrid(newGrid);
               }
             }
           }
-          return <button className={grid_style} key={row * 17 + col} onMouseDown={handler_func} onMouseEnter={handler_func} >
+          return <button className={grid_style} key={row * 15 + col} onMouseDown={handler_func} onMouseEnter={handler_func} >
             {inner_element}
           </button>
         })
@@ -83,7 +83,7 @@ const PieceView: FC<PieceViewProps> = ({ piece }) => {
       {
         _.uniq(_.flatMap(piece.moves)).filter((x) => { return x != null }).map((moveName) => {
           const move = NAME_TO_MOVE.get(moveName!)!;
-          return <div key={moveName} className='inline-flex'> <MoveIcon move={move}></MoveIcon>{move.text}</div>;
+          return <div key={moveName} className='inline-flex'> <MoveIcon move={move}></MoveIcon>{move.overview}</div>;
         })
       }
     </div>

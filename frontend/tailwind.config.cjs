@@ -12,14 +12,14 @@ module.exports = {
         'grid_dark': '#F4F4F4',
       },
       gridTemplateRows: {
-        '17': 'repeat(17, minmax(0, 1fr))'
+        '15': 'repeat(15, minmax(0, 1fr))'
       },
       gridTemplateColumns: {
-        '17': 'repeat(17, minmax(0, 1fr))'
+        '15': 'repeat(15, minmax(0, 1fr))'
       },
       spacing: {
-        '68': '17rem',
-        '85': '21.25rem',
+        '60': '15rem',
+        '75': '18.75rem',
       }
     },
   },

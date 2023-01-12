@@ -3,17 +3,17 @@ import { ReactSketchCanvas, ReactSketchCanvasRef } from "react-sketch-canvas";
 import { Tabs, Tooltip, Card, Textarea, Button, Label, TextInput } from "flowbite-react"
 import { MOVES, NAME_TO_MOVE } from './definitions'
 import _ from 'lodash'
-import { MoveGrid, Move, Piece} from './types'
+import { MoveGrid, Move, Piece } from './types'
 import { MovesView } from './PieceView'
 import MoveIcon from './MoveIcon'
-import {HelpModal, ImplementationHelpModal } from "./HelpModal";
+import { HelpModal, ImplementationHelpModal } from "./HelpModal";
 
 interface PieceEditorProps {
   mouseDownState: number
 }
 
-const initMoveGrid: MoveGrid = Array.from({ length: 17 }).map(() => {
-  return Array.from({ length: 17 }).map(() => {
+const initMoveGrid: MoveGrid = Array.from({ length: 15 }).map(() => {
+  return Array.from({ length: 15 }).map(() => {
     return null
   });
 });
@@ -36,7 +36,7 @@ const PieceEditor: FC<PieceEditorProps> = ({ mouseDownState }) => {
       canvas.current?.eraseMode(false);
     }
   };
-  const savePiece: React.ChangeEventHandler<HTMLButtonElement> = (e) => {
+  const savePiece: React.MouseEventHandler<HTMLButtonElement> = (e) => {
     canvas.current?.exportImage('png').then(data => {
       const creation: Piece = {
         name: pieceName,
@@ -53,14 +53,15 @@ const PieceEditor: FC<PieceEditorProps> = ({ mouseDownState }) => {
     <div className="grid sm:grid-cols-2">
       {/* Unit view */}
       <div className="col-span-1">
-        <form className="flex flex-col w-68 place-items-center">
-            <TextInput
-              id="pieceName"
-              type="text"
-              placeholder="Piece Name"
-              value={pieceName}
-              onChange={(e) => setPieceName(e.target.value)}
-            />
+        <form className="flex flex-col w-60 place-items-center">
+          <TextInput
+            id="pieceName"
+            type="text"
+            placeholder="Piece Name"
+            value={pieceName}
+            onChange={(e) => setPieceName(e.target.value)}
+            maxLength={32}
+          />
         </form>
         <div className='py-1 place-items-center'>
           <ReactSketchCanvas
@@ -82,7 +83,7 @@ const PieceEditor: FC<PieceEditorProps> = ({ mouseDownState }) => {
           {
             _.uniq(_.flatMap(moveGrid)).filter((x) => { return x != null }).map((moveName) => {
               const move = NAME_TO_MOVE.get(moveName!)!;
-              return <div className='inline-flex'> <MoveIcon move={move}></MoveIcon>{move.text}</div>;
+              return <div className='inline-flex'> <MoveIcon move={move}></MoveIcon>{move.overview}</div>;
             })
           }
         </div>
@@ -98,41 +99,41 @@ const PieceEditor: FC<PieceEditorProps> = ({ mouseDownState }) => {
                   if (move.name == selectedMoveName) {
                     buttonClassName += " bg-stone-600"
                   }
-                  return <Tooltip animation={false} content={move.name + ": " + move.text} key={move.name}>
+                  return <Tooltip animation={false} content={move.name + ": " + move.overview} key={move.name}>
                     <button onClick={
-                    () => {selectMove(move.name); setImplementationValue(move.implementation); }
+                      () => { selectMove(move.name); setImplementationValue(move.implementation); }
                     } className={buttonClassName}><MoveIcon move={move} />
-                  </button></Tooltip>
+                    </button></Tooltip>
                 })}
               </>
             </div>
-            {selectedMoveName === 'cancel'? <></>:
-                <Card>
-                  {
-                    <div>
-                      <div className="grid grid-cols-12">
-                        <div className='col-span-1'>
-                      <MoveIcon move={selectedMove}/>
-                       </div>
-                      <p className='px-1 col-span-3 text-m'>{selectedMove.text}</p>
-                      <p className='px-2 col-span-6 text-m'>{selectedMove.long}</p>
+            {selectedMoveName === 'cancel' ? <></> :
+              <Card>
+                {
+                  <div>
+                    <div className="grid grid-cols-12">
+                      <div className='col-span-1'>
+                        <MoveIcon move={selectedMove} />
                       </div>
-                      <div>
+                      <p className='px-1 col-span-3 text-m'>{selectedMove.overview}</p>
+                      <p className='px-2 col-span-6 text-m'>{selectedMove.description}</p>
+                    </div>
+                    <div>
                       <div className="inline-flex">
-                      <label>{selectedMove.name}(source, target)</label>
-                      <ImplementationHelpModal/>
-        </div>
-                      <Textarea readOnly={selectedMove.cat !== 'custom'} autoCorrect="off" 
-                        style={{whiteSpace:"pre-wrap"}} className="h-96"
-                        spellCheck={false} wrap="soft" value={implementationValue} onChange={(e)=>{
+                        <label>def {selectedMove.name}(source, target):</label>
+                        <ImplementationHelpModal />
+                      </div>
+                      <Textarea readOnly={selectedMove.cat !== 'custom'} autoCorrect="off"
+                        style={{ whiteSpace: "pre-wrap" }} className="h-96"
+                        spellCheck={false} wrap="soft" value={implementationValue} onChange={(e) => {
                           setImplementationValue(e.target.value);
                           selectedMove.implementation = e.target.value;
-                          }}/>
+                        }} />
                       <div className="inline-flex">
-                      <label>Trigger Implementation</label>
-                      <HelpModal text="[Optional, not yet implemented]: Create a square that automatically triggers when a specified condition is met."/>
+                        <label>Trigger Implementation</label>
+                        <HelpModal text="[Optional, not yet implemented]: Create a square that automatically triggers when a specified condition is met." />
                       </div>
-                      Triggered from: 
+                      {/* Triggered from:
                       [
                         Unit dies, 
                         Targed by Melee Attack from here,
@@ -141,14 +142,14 @@ const PieceEditor: FC<PieceEditorProps> = ({ mouseDownState }) => {
                         Targeted by Enemy from here,
                         Targeted by Ally from here,
                         Your turn begins
-                      ]
-                      <Textarea readOnly={selectedMove.cat !== 'custom'} autoCorrect="off" 
-                        style={{whiteSpace:"pre-wrap"}} className="h-96 z-0"
-                        spellCheck={false} wrap="soft" value='TBD'/>
-                      </div>
+                      ] */}
+                      <Textarea readOnly={selectedMove.cat !== 'custom'} autoCorrect="off"
+                        style={{ whiteSpace: "pre-wrap" }} className="h-96 z-0"
+                        spellCheck={false} wrap="soft" value='TBD' />
                     </div>
-                  }
-                </Card>
+                  </div>
+                }
+              </Card>
             }
           </Tabs.Item>
           {/* Drawing Tools */}
