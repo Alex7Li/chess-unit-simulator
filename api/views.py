@@ -4,5 +4,5 @@ from django.shortcuts import render
 from django.http import HttpResponse
 
 
-def index(request):
-    return HttpResponse("Hello, world. You're at the chess index.")
+def documentation(request):
+    return HttpResponse("Yo! Welcome to the API.")

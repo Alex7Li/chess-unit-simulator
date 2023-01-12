@@ -12,3 +12,5 @@ In another terminal, run the backend
 ```bash
 :$ python manage.py runserver
 ```
+
+![frontend demo](/frontend_demo.gif)

@@ -27,6 +27,7 @@ from django.conf import settings
 #   + static(settings.STATIC_URL, document_root=settings.STATIC_ROOT)
 urlpatterns = [
     path('admin/', admin.site.urls),
+    path('api', include('api.urls')),
     re_path(r"^public/(?P<path>.*)$", serve, {"document_root": settings.STATIC_ROOT}), 
     re_path(r"^.*$", TemplateView.as_view(template_name="base.html"),),
 ]

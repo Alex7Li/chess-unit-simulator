@@ -10,6 +10,7 @@
   },
   "dependencies": {
     "@heroicons/react": "^2.0.13",
+    "axios": "^0.21.1",
     "color-convert": "^2.0.1",
     "flowbite": "^1.6.0",
     "flowbite-react": "^0.3.7",
