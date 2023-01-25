@@ -8,9 +8,13 @@ Run the frontend
 ```
 Do not terminate this process.
 
-In another terminal, run the backend
+In another terminal, run the backend (in a environment with the required packages)
 ```bash
 :$ python manage.py runserver
+```
+You can also open up a shell for testing
+```bash
+:$ python manage.py shell
 ```
 
 ![frontend demo](/frontend_demo.gif)

@@ -25,13 +25,15 @@ def render_vite_bundle():
         raise Exception(
             f"Vite manifest file not found or invalid. Maybe your {settings.VITE_APP_DIR}/dist/manifest.json file is empty?"
         )
-
-    imports_files = "".join(
-        [
-            f'<script type="module" src="/public/{manifest[file]["file"]}"></script>'
-            for file in manifest["index.html"]["imports"]
-        ]
-    )
+    try:
+        imports_files = "".join(
+            [
+                f'<script type="module" src="/public/{manifest[file]["file"]}"></script>'
+                for file in manifest["index.html"]["imports"]
+            ]
+        )
+    except KeyError:
+        imports_files = ""
 
     return mark_safe(
         f"""<script type="module" src="/public/{manifest['index.html']['file']}"></script>

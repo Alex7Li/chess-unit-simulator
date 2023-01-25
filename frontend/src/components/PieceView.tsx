@@ -1,10 +1,8 @@
 import React, { FC, useState } from "react";
-import { Piece, MoveGrid } from './types'
-import { MOVES, NAME_TO_MOVE } from './definitions'
+import { Piece, Move, MoveGrid } from './types'
 import { FaceSmileIcon } from '@heroicons/react/24/outline'
 import _ from 'lodash'
 import MoveIcon from './MoveIcon'
-
 interface PieceViewProps {
   piece: Piece;
 }
@@ -12,16 +10,17 @@ interface PieceViewProps {
 interface MovesViewProps {
   moveGrid: MoveGrid;
   changeMoveGrid?: React.Dispatch<React.SetStateAction<MoveGrid>>;
-  selectedMoveName?: string
-  mouseDownState?: number
+  uidToMove: Map<Number, Move>
+  selectedMove?: Move
+  mouseDownState?: Number
 }
 
-export const MovesView: FC<MovesViewProps> = ({ moveGrid, changeMoveGrid, selectedMoveName, mouseDownState }) => {
-  const editable = (changeMoveGrid !== undefined) && (selectedMoveName !== undefined) && (mouseDownState !== undefined)
+export const MovesView: FC<MovesViewProps> = ({ moveGrid, changeMoveGrid, selectedMove, mouseDownState, uidToMove}) => {
+  const editable = (changeMoveGrid !== undefined) && (selectedMove !== undefined) && (mouseDownState !== undefined)
   return (
     <div className="grid grid-cols-15 grid-rows-15 gap-x-0 w-75 h-75 border-gray-900 border-2 p-0 m-0">
       {moveGrid.map((moveLine, row) => {
-        return moveLine.map((moveName, col) => {
+        return moveLine.map((moveUID, col) => {
           const parity = (row + col) % 2 === 0 ? 'dark' : 'light';
           // Note: we need to include all class names in the code so that tailwind
           // sees that we are using them (can't do bg-grid_{parity})
@@ -35,8 +34,10 @@ export const MovesView: FC<MovesViewProps> = ({ moveGrid, changeMoveGrid, select
           if (row == 7 && col == 7) {
             inner_element = <div className="rounded-full"><FaceSmileIcon /></div>
           }
-          if (moveName) {
-            inner_element = <div className="-translate-y-0.5 -translate-x-0.5"><MoveIcon move={NAME_TO_MOVE.get(moveName)!} /></div>
+          if (moveUID) {
+            inner_element = <div className="-translate-y-0.5 -translate-x-0.5">
+              <MoveIcon move={uidToMove.get(moveUID)!} />
+              </div>
           }
           let handler_func:  React.MouseEventHandler<HTMLButtonElement> | undefined = undefined;
           if (editable) {
@@ -50,12 +51,12 @@ export const MovesView: FC<MovesViewProps> = ({ moveGrid, changeMoveGrid, select
                 const newGrid = _.cloneDeep(moveGrid);
                 // Erase if we are using the cancel item, or if
                 // the mouse is holding down the right click button.
-                if (selectedMoveName == 'cancel' || mouseDownState == 2 || ("mousedown" && e.button == 2)) {
+                if (selectedMove.name == 'cancel' || mouseDownState == 2 || ("mousedown" && e.button == 2)) {
                   newGrid[row][col] = null;
                   newGrid[row][15 - col - 1] = null;
                 } else {
-                  newGrid[row][col] = selectedMoveName;
-                  newGrid[row][15 - col - 1] = selectedMoveName;
+                  newGrid[row][col] = selectedMove.uid;
+                  newGrid[row][15 - col - 1] = selectedMove.uid;
                 }
                 changeMoveGrid(newGrid);
               }
@@ -77,15 +78,17 @@ const PieceView: FC<PieceViewProps> = ({ piece }) => {
     <img draggable="false" src={piece.image} />
 
     <div className='container mx-auto p-1' onContextMenu={(e) => e.preventDefault()}>
-      <MovesView moveGrid={piece.moves} />
+      {/* <MovesView moveGrid={piece.moves} /> */}
     </div>
     <div className='container mx-auto p-1'>
+      <p>TODO: Display the moves corresponding to the moves in the piece info.</p>
+      {/* 
       {
         _.uniq(_.flatMap(piece.moves)).filter((x) => { return x != null }).map((moveName) => {
           const move = NAME_TO_MOVE.get(moveName!)!;
           return <div key={moveName} className='inline-flex'> <MoveIcon move={move}></MoveIcon>{move.overview}</div>;
         })
-      }
+      } */}
     </div>
   </div>
 }

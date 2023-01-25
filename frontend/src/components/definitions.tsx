@@ -1,6 +1,7 @@
 import _ from 'lodash'
 import convert from 'color-convert'
 import { Move, Piece } from './types'
+export const API_URL = 'http://127.0.0.1:8000/api'
 
 const default_lightness = 72;
 export const PIECES: Array<Piece> = [
@@ -27,7 +28,6 @@ export const MOVES: Array<Move> = [
     "overview": "Use to delete an action. Left click works as well.",
     "description": "Delete an action you added before..",
     "color": convert.hsl.rgb([120, 0, 100]),
-    "borderColor": convert.hsl.rgb([120, 0, 90]),
     "implementation": "",
     "symbol": "\u232B",
   }, {
@@ -162,11 +162,6 @@ const PASSIVES: Array<string> = [
   "Promotes to PieceName[+].",
   "On Death: Lose 2[+1] morale."
 ];
-
-export const NAME_TO_MOVE = new Map<String, Move>(); //Lookup key by move name
-_.forEach(MOVES, function (m: Move, ix: number) {
-  NAME_TO_MOVE.set(m.name, m);
-});
 
 export const NAME_TO_PIECE = new Map<String, Piece>(); //Lookup key by move name
 _.forEach(PIECES, function (p: Piece, ix: number) {

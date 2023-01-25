@@ -22,12 +22,11 @@
     }
   </script>
   {% endif %}
+  {% csrf_token %}
 </head>
 
 <body>
-
   <div id="root"></div>
-
   {% if debug %}
   <script type="module" src="http://localhost:5173/src/main.tsx"></script>
   {% else %}

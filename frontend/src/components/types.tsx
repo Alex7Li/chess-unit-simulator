@@ -6,22 +6,22 @@ export interface Passive {
 export interface Move {
   cat: string; //max length 15
   color: Array<number>; // stored in rgb
-  borderColor?: Array<number>;
   implementation: string
   name: string; // max length 31
   overview: string; // max length 127
   description: string;
   symbol: string; // max length 3
   author?: string; // max length 31
+  uid: number; // max length 31
 }
 
-export type MoveGrid = (string | null)[][];
+export type MoveGrid = (number | null)[][];
 
 export interface Piece {
   name: string; // max length 31
   image: string;
   moves: MoveGrid;
-  passives: Passive[];
+  passives: string;
   author?: string;
 }
 

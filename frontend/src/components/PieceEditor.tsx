@@ -1,16 +1,13 @@
-import React, { FC, useRef, useState } from "react";
+import React, { FC, useRef, useState, useEffect } from "react";
 import { ReactSketchCanvas, ReactSketchCanvasRef } from "react-sketch-canvas";
 import { Tabs, Tooltip, Card, Textarea, Button, Label, TextInput } from "flowbite-react"
-import { MOVES, NAME_TO_MOVE } from './definitions'
 import _ from 'lodash'
 import { MoveGrid, Move, Piece } from './types'
 import { MovesView } from './PieceView'
 import MoveIcon from './MoveIcon'
-import { HelpModal, ImplementationHelpModal } from "./HelpModal";
-
-interface PieceEditorProps {
-  mouseDownState: number
-}
+import { IntegerInput } from "./NumericInput"
+import { SaveElement, SaveState } from "./utils";
+import { api } from "../App"
 
 const initMoveGrid: MoveGrid = Array.from({ length: 15 }).map(() => {
   return Array.from({ length: 15 }).map(() => {
@@ -18,16 +15,78 @@ const initMoveGrid: MoveGrid = Array.from({ length: 15 }).map(() => {
   });
 });
 
+export const moveOrder = (a: Move) => {
+  switch (a.cat) {
+    case "UI": return 0;
+    case "official": return 1;
+    case "custom": return 2;
+    case "unmade": return 3;
+    default: console.error("Got bad move category: " + a.cat); return 3;
+  }
+}
+
+interface MoveSelectProps {
+  onClick: (move: Move) => void;
+  moves: Array<Move>;
+  highlightedMove?: Move,
+}
+export const MoveSelect: FC<MoveSelectProps> = ({moves, onClick, highlightedMove}) => {
+  return <div className="grid grid-cols-10 w-80">
+    <>
+      {moves.map((move: Move, idx) => {
+        let buttonClassName = 'h-6 w-6';
+        if (move === highlightedMove) {
+          buttonClassName += " bg-stone-600"
+        }
+        return <Tooltip animation={false} content={move.name + ": " + move.overview} key={idx}>
+          <button onClick={(e) => { onClick(move) }} className={buttonClassName}><MoveIcon move={move} />
+          </button></Tooltip>
+      })}
+    </>
+  </div>
+
+}
+interface PieceEditorProps {
+  mouseDownState: number
+}
+
 const PieceEditor: FC<PieceEditorProps> = ({ mouseDownState }) => {
   const [strokeWidth, setStrokeWidth] = useState(4);
   const [eraseWidth, setEraseWidth] = useState(20);
   // const [color, setColor] = useState("black");
   const canvas = useRef<ReactSketchCanvasRef>(null);
-  const [selectedMoveName, selectMove] = useState<string>('cancel');
   const [pieceName, setPieceName] = useState<string>('');
-  const selectedMove = NAME_TO_MOVE.get(selectedMoveName)!;
   const [moveGrid, changeMoveGrid] = useState<MoveGrid>(initMoveGrid);
-  const [implementationValue, setImplementationValue] = useState<string>('');
+
+  // const [moves, updateMoves] = useState(MOVES);
+  const [moves, updateMoves] = useState<Array<Move>>([{
+    "cat": "UI",
+    "name": "cancel",
+    "overview": "Use to delete an action. ",
+    "description": "Delete an action you added before. Left click works as well.",
+    "color": [255, 255, 255],
+    "implementation": "",
+    "symbol": "\u232B",
+    "uid": -1,
+  }]);
+  const [selectedMove, selectMove] = useState<Move>(moves[0]);
+  const [saveStatus, setSaveStatus] = useState<SaveState>("ok")
+  useEffect(() => {
+    api.get('/moves', {
+      params: {}
+    }).then((response) => {
+      let new_moves = [...moves, ...response.data];
+      new_moves = _.uniqBy(new_moves, (move) => move.uid)
+      new_moves.sort((a, b) => {
+        return moveOrder(a) - moveOrder(b);
+      })
+      updateMoves(new_moves)
+    })
+  }, [saveStatus])
+  const uid_to_move = new Map<Number, Move>(); //Lookup key by move name
+  _.forEach(moves, function (m: Move, ix: number) {
+    uid_to_move.set(m.uid, m);
+  });
 
   const toolChange: React.ChangeEventHandler<HTMLInputElement> = (e) => {
     if (e.target.id === "Eraser") {
@@ -37,16 +96,25 @@ const PieceEditor: FC<PieceEditorProps> = ({ mouseDownState }) => {
     }
   };
   const savePiece: React.MouseEventHandler<HTMLButtonElement> = (e) => {
+    setSaveStatus("saving");
     canvas.current?.exportImage('png').then(data => {
+      console.log(data)
       const creation: Piece = {
         name: pieceName,
-        passives: [],
+        passives: "",
         image: data,
         moves: moveGrid,
       }
-      console.log(creation);
+      api.post('/pieces',
+        {params: {creation}}
+      ).then((response) => {
+        setSaveStatus('ok');
+      }).catch(() => {
+        setSaveStatus('fail');
+      })
     }).catch(e => {
-      window.alert(e)
+      setSaveStatus('fail');
+      console.error(e);
     })
   }
   return (
@@ -60,7 +128,7 @@ const PieceEditor: FC<PieceEditorProps> = ({ mouseDownState }) => {
             placeholder="Piece Name"
             value={pieceName}
             onChange={(e) => setPieceName(e.target.value)}
-            maxLength={32}
+            maxLength={31}
           />
         </form>
         <div className='py-1 place-items-center'>
@@ -77,13 +145,13 @@ const PieceEditor: FC<PieceEditorProps> = ({ mouseDownState }) => {
           />
         </div>
         <div className='container mx-auto p-1' onContextMenu={(e) => e.preventDefault()}>
-          <MovesView moveGrid={moveGrid} changeMoveGrid={changeMoveGrid} selectedMoveName={selectedMoveName} mouseDownState={mouseDownState} />
+          <MovesView moveGrid={moveGrid} changeMoveGrid={changeMoveGrid} selectedMove={selectedMove} mouseDownState={mouseDownState} uidToMove={uid_to_move} />
         </div>
         <div className='container mx-auto p-1'>
           {
-            _.uniq(_.flatMap(moveGrid)).filter((x) => { return x != null }).map((moveName) => {
-              const move = NAME_TO_MOVE.get(moveName!)!;
-              return <div className='inline-flex'> <MoveIcon move={move}></MoveIcon>{move.overview}</div>;
+            _.uniq(_.flatMap(moveGrid)).filter((x) => { return x != null }).map((moveName, idx) => {
+              const move = uid_to_move.get(moveName!)!;
+              return <div className='inline-flex' key={idx}> <MoveIcon move={move}></MoveIcon>{move.overview}</div>;
             })
           }
         </div>
@@ -92,65 +160,28 @@ const PieceEditor: FC<PieceEditorProps> = ({ mouseDownState }) => {
         <Tabs.Group aria-label="Default tabs">
           {/* Action Tools */}
           <Tabs.Item title="Actions">
-            <div className="grid grid-cols-10 w-80">
-              <>
-                {MOVES.map((move: Move) => {
-                  let buttonClassName = 'h-6 w-6';
-                  if (move.name == selectedMoveName) {
-                    buttonClassName += " bg-stone-600"
-                  }
-                  return <Tooltip animation={false} content={move.name + ": " + move.overview} key={move.name}>
-                    <button onClick={
-                      () => { selectMove(move.name); setImplementationValue(move.implementation); }
-                    } className={buttonClassName}><MoveIcon move={move} />
-                    </button></Tooltip>
-                })}
-              </>
-            </div>
-            {selectedMoveName === 'cancel' ? <></> :
-              <Card>
-                {
-                  <div>
-                    <div className="grid grid-cols-12">
-                      <div className='col-span-1'>
-                        <MoveIcon move={selectedMove} />
-                      </div>
-                      <p className='px-1 col-span-3 text-m'>{selectedMove.overview}</p>
-                      <p className='px-2 col-span-6 text-m'>{selectedMove.description}</p>
-                    </div>
-                    <div>
+            <MoveSelect onClick={(move: Move) => selectMove(move)} moves={moves} highlightedMove={selectedMove}/>
+            <Card>
+              <div className="grid grid-cols-12">
+                <div className='col-span-1'>
+                  <MoveIcon move={selectedMove} />
+                </div>
+                <p className="px-1 mx-0.5 col-span-4 text-m h-18">{selectedMove.overview}</p>
+                <p className="px-2 mx-0.5 col-span-7 text-m h-18">{selectedMove.description}</p>
+                <div>
+                  {selectedMove.implementation ?
+                    <>
                       <div className="inline-flex">
-                        <label>def {selectedMove.name}(source, target):</label>
-                        <ImplementationHelpModal />
+                        <label className='flex'>
+                          <p className='h-0 w-fit whitespace-nowrap'>{selectedMove.name}(source, target):</p>
+                        </label>
                       </div>
-                      <Textarea readOnly={selectedMove.cat !== 'custom'} autoCorrect="off"
-                        style={{ whiteSpace: "pre-wrap" }} className="h-96"
-                        spellCheck={false} wrap="soft" value={implementationValue} onChange={(e) => {
-                          setImplementationValue(e.target.value);
-                          selectedMove.implementation = e.target.value;
-                        }} />
-                      <div className="inline-flex">
-                        <label>Trigger Implementation</label>
-                        <HelpModal text="[Optional, not yet implemented]: Create a square that automatically triggers when a specified condition is met." />
-                      </div>
-                      {/* Triggered from:
-                      [
-                        Unit dies, 
-                        Targed by Melee Attack from here,
-                        Targeted by Ranged attack from here,
-                        Targeted by Magic from here,
-                        Targeted by Enemy from here,
-                        Targeted by Ally from here,
-                        Your turn begins
-                      ] */}
-                      <Textarea readOnly={selectedMove.cat !== 'custom'} autoCorrect="off"
-                        style={{ whiteSpace: "pre-wrap" }} className="h-96 z-0"
-                        spellCheck={false} wrap="soft" value='TBD' />
-                    </div>
-                  </div>
-                }
-              </Card>
-            }
+                      <p>{selectedMove.implementation}</p>
+                    </>
+                    : <></>}
+                </div>
+              </div>
+            </Card>
           </Tabs.Item>
           {/* Drawing Tools */}
           <Tabs.Item title="Drawing">
@@ -168,38 +199,8 @@ const PieceEditor: FC<PieceEditorProps> = ({ mouseDownState }) => {
                   > {toolName} </label>
                 </div>
               ))}
-              <div className="flex items-center" key='pen'>
-                <label htmlFor="strokeSize" key='penSizelabel'
-                  className="block mb-2 w-12 pr-4 text-sm font-medium text-gray-900 dark:text-white"
-                > Pen Width </label>
-                <input type="range" id="strokeSize" name="strokeSize" min="0" max="30" value={strokeWidth}
-                  onChange={(e) => {
-                    const val = parseInt(e.target.value)
-                    if (val) {
-                      setStrokeWidth(val)
-                    }
-                  }
-                  }
-                  key='penSize'
-                  className="h-2 bg-gray-200 rounded-lg appearance-none cursor-pointer dark:bg-gray-700"
-                />
-              </div>
-              <div className="flex items-center">
-                <label htmlFor="eraseSize" key='eraserSizelabel'
-                  className="block mb-2 w-12 pr-4 text-sm font-medium text-gray-900 dark:text-white"
-                > Eraser Width </label>
-                <input type="range" id="eraseSize" name="eraseSize" min="0" max="20" value={eraseWidth}
-                  onChange={(e) => {
-                    const val = parseInt(e.target.value)
-                    if (val) {
-                      setEraseWidth(val)
-                    }
-                  }
-                  }
-                  key='eraserSize'
-                  className="h-2 bg-gray-200 rounded-lg appearance-none cursor-pointer dark:bg-gray-700"
-                />
-              </div>
+              <IntegerInput min={0} max={20} formValue={strokeWidth} setFormValue={setStrokeWidth} label="Pen Size" barStyle />
+              <IntegerInput min={0} max={30} formValue={eraseWidth} setFormValue={setEraseWidth} label="Eraser Size" barStyle />
               <div className="inline-flex rounded-md shadow-sm" role="group">
                 <button type="button" onClick={() => { canvas.current?.undo() }} className="px-4 py-2 text-sm font-medium text-gray-900 bg-white border border-gray-200 rounded-l-lg hover:bg-gray-100 hover:text-blue-700 focus:z-10 focus:ring-2 focus:ring-blue-700 focus:text-blue-700 dark:bg-gray-700 dark:border-gray-600 dark:text-white dark:hover:text-white dark:hover:bg-gray-600 dark:focus:ring-blue-500 dark:focus:text-white">
                   Undo
@@ -207,9 +208,14 @@ const PieceEditor: FC<PieceEditorProps> = ({ mouseDownState }) => {
                 <button type="button" onClick={() => { canvas.current?.redo() }} className="px-4 py-2 text-sm font-medium text-gray-900 bg-white border border-gray-200 rounded-r-md hover:bg-gray-100 hover:text-blue-700 focus:z-10 focus:ring-2 focus:ring-blue-700 focus:text-blue-700 dark:bg-gray-700 dark:border-gray-600 dark:text-white dark:hover:text-white dark:hover:bg-gray-600 dark:focus:ring-blue-500 dark:focus:text-white">
                   Redo
                 </button>
-                <Button onClick={savePiece}>Save</Button>
               </div>
             </fieldset >
+          </Tabs.Item>
+          <Tabs.Item title="Admin">
+            <div className='inline-flex'>
+              <Button onClick={savePiece}>Save</Button>
+              <SaveElement savingState={saveStatus} />
+            </div>
           </Tabs.Item>
         </Tabs.Group>
       </div>
