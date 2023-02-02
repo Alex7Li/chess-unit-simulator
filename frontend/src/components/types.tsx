@@ -12,7 +12,7 @@ export interface Move {
   description: string;
   symbol: string; // max length 3
   author?: string; // max length 31
-  uid: number; // max length 31
+  pk: number; // max length 31
 }
 
 export type MoveGrid = (number | null)[][];

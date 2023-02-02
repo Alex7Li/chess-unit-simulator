@@ -22,7 +22,7 @@ const newMoveTemplate: Move = {
   "color": [_.random(0, 255), _.random(0, 255), _.random(0, 255)],
   "implementation": "",
   "symbol": "+",
-  "uid": -2,
+  "pk": -2,
 }
 
 interface MoveSelectModalProps {
@@ -36,7 +36,7 @@ const MoveSelectModal: FC<MoveSelectModalProps> = ({setSelectedMove}) => {
       params: {}
     }).then((response) => {
       let new_moves = [...moves, ...response.data];
-      new_moves = _.uniqBy(new_moves, (move) => move.uid)
+      new_moves = _.uniqBy(new_moves, (move) => move.pk)
       new_moves.sort((a, b) => {
         return moveOrder(a) - moveOrder(b);
       })
@@ -74,7 +74,7 @@ export const MoveEditor: FC<MoveEditorProps> = ({ }) => {
   const [editMoveId, setEditMoveId] = useState<undefined | number>(undefined)
   const setSelectedMove = (move: Move) => {
     setMove(move);
-    setEditMoveId(move.uid);
+    setEditMoveId(move.pk);
   }
 
   const saveMove = () => {

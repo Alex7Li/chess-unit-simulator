@@ -4,7 +4,7 @@ from django.utils.decorators import method_decorator
 from rest_framework.views import APIView
 from rest_framework.response import Response
 from rest_framework import authentication, permissions, status
-from api.models import Move, Piece, ImageModel, to_color_string, from_color_string
+from api.models import Move, Piece, to_color_string, PieceSerializer, MoveSerializer
 import json
 from django.contrib.auth.models import User
 from django.contrib.auth import authenticate, login, logout
@@ -83,14 +83,7 @@ class Moves(APIView):
         user_moves = []
         if request.user.is_authenticated:
             user_moves = Move.objects.filter(author=request.user)
-        all_moves = []
-        move_names = set()
-        for move in official_moves:
-            all_moves.append(move.make_serializable())
-            move_names.add(move.name)
-        for move in user_moves:
-            if move.name not in move_names:
-                all_moves.append(move.make_serializable())
+        all_moves = [MoveSerializer(move).data for move in official_moves.union(user_moves)]
         return JsonResponse(all_moves, safe=False)
 
     def post(self, request):
@@ -115,22 +108,26 @@ class Pieces(APIView):
     """
     def get(self, request, format=None):
         """
-        Return a list of all pieces.
-        TODO: and the moves that they use
+        Return a list of all pieces, and the moves that they use.
         """
-        official_moves = Piece.objects.filter(cat=Move.Category.OFFICIAL)
-        user_moves = []
+        official_pieces = Piece.objects.filter(cat=Move.Category.OFFICIAL)
+        user_pieces = []
         if request.user.is_authenticated:
-            user_moves = Piece.objects.filter(author=request.user)
-        all_pieces = []
-        move_names = set()
-        for move in official_moves:
-            all_pieces.append(move.make_serializable())
-            move_names.add(move.name)
-        for move in user_moves:
-            if move.name not in move_names:
-                all_pieces.append(move.make_serializable())
-        return JsonResponse(all_pieces, safe=False)
+            user_pieces = Piece.objects.filter(author=request.user)
+        all_pieces = official_pieces.union(user_pieces)
+        serialized_pieces = []
+        all_move_pks = set()
+        for piece in all_pieces:
+            serialized_pieces.append(PieceSerializer(piece).data)
+            for move_pk in serialized_pieces[-1]['piecemoves']:
+                all_move_pks.add(move_pk['move'])
+        move_pk_map = {
+            move_pk: MoveSerializer(Move.objects.get(('pk', move_pk))).data for move_pk in all_move_pks
+        }
+        return JsonResponse({
+            'pieces': serialized_pieces,
+            'move_map': move_pk_map
+        })
 
     def post(self, request):
         """Create a new piece
@@ -139,8 +136,9 @@ class Pieces(APIView):
         if not request.user.is_authenticated:
             return ResponseWithMessage("You must be logged in to save", status=status.HTTP_401_UNAUTHORIZED)
         user = User.objects.get(('id', request.user.id))
-        saved_piece = Piece.create_piece(image=piece['image'], author=user, name=piece['name'],
-                           moves=piece['moves'], cat=Piece.Category.CUSTOM)
+        moves_dict = json.loads(piece['moves'])
+        Piece.create_piece(image=piece['image'], author=user, name=piece['name'],
+                           moves=moves_dict, cat=Piece.Category.CUSTOM)
         return Response(status=status.HTTP_201_CREATED)
 
 if __name__ == "__main__":

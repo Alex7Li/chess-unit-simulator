@@ -3,21 +3,16 @@ from django.utils.translation import gettext_lazy as _
 from django.core.validators import MaxValueValidator, MinValueValidator
 from django.core.exceptions import ValidationError
 from django.contrib.auth.models import User
-from json import JSONEncoder
-from typing import Dict, Tuple
-from django.core.files import File
-from pathlib import Path
+from typing import Dict, Tuple, List
 from PIL import Image
 from io import BytesIO
-from django.core.files.uploadedfile import InMemoryUploadedFile
+from django.core.files import File
+from rest_framework import serializers
 
 import base64
 
 def to_color_string(color_array):
     return '[' + ','.join(map(str, color_array)) + ']'
-
-def from_color_string(color_array):
-    return list(map(int, color_array[1:-1].split(',')))
 
 def validate_color(color_string):
     valid_color = color_string[0] == '[' and color_string[-1] == ']'
@@ -50,73 +45,59 @@ class Move(models.Model):
 
     def __str__(self):
         return f"Move: {self.name} by {self.author}"
-    def make_serializable(self):
-        return {
-            'author': self.author.username,
-            'uid': self.pk,
-            'cat': self.cat,
-            'color': from_color_string(self.color),
-            'implementation': self.implementation,
-            'name': self.name,
-            'overview': self.overview,
-            'description': self.description,
-            'symbol': self.symbol,
-        }
-        
+
     class Meta:
         indexes = [models.Index(fields=['name', 'author'])]
 
+class MoveSerializer(serializers.ModelSerializer):
+    author = serializers.SlugRelatedField('username', read_only=True)
 
-class ImageModel(models.Model):
-    image = models.ImageField(upload_to="pieces/")
+    def to_representation(self, obj):
+        data = super().to_representation(obj)
+        data['color'] =  list(map(int, data['color'][1:-1].split(',')))
+        return data
 
+    class Meta:
+        model = Move
+        fields = ['pk', 'cat', 'color', 'implementation', 'name', 'overview', 'description', 'symbol', 'author']
 
 class Piece(models.Model):
-    image = models.ForeignKey(ImageModel, on_delete=models.RESTRICT)
-    author = models.ForeignKey(User, on_delete=models.CASCADE)
+    image = models.ImageField(upload_to="pieces/")
+    author = models.ForeignKey(User, on_delete=models.CASCADE, related_name='author')
     class Category(models.TextChoices):
         OFFICIAL = 'official'
         CUSTOM = 'custom'
     cat = models.CharField(max_length=10, choices=Category.choices, default=Category.CUSTOM)
     name = models.CharField(max_length=31, unique=True)
-    def make_serializable(self):
-        return {
-            'author': self.author.username,
-            'uid': self.pk,
-            'cat': self.cat,
-            'name': self.name,
-        }
 
     def __str__(self):
         return f"Piece: {self.name} by {self.author}"
 
     @staticmethod
     def create_piece(image: str, author: User,
-                     name: str, moves: Dict[Tuple[int, int], Move],
+                     name: str, moves: Dict[int, List[Tuple[int, int]]],
                      cat: Category):
         # image is formated as 'data:image/png;base64,iVBOr==EGk'
         content_type, base64_data = image.split(',')
         content_type = content_type.split(':')[1].split(';')[0]
-        pil_im = Image.open(BytesIO(base64.b64decode(base64_data)))
-        img_fpath = f"media/pieces/{name}.png"
-        pil_im.save(img_fpath)
-        with open(img_fpath, 'r') as f:
-            image_db = ImageModel(image=f)
-        image_db.full_clean()
-        piece = Piece(author=author, name=name, cat=cat, image=image_db)
+        img_fpath = f"{name}.png"
+        piece = Piece(author=author, name=name, cat=cat)
+        image_data = File(BytesIO(base64.b64decode(base64_data)))
+        piece.image.save(img_fpath, image_data, True)
         piece.full_clean()
-        pieceMoves = []
-        for (drow, dcol), move in moves.items():
-            pieceMoves.append(PieceMove(
-                relative_row=drow,
-                relative_col=dcol,
-                move=move,
-                piece=piece,
-            ))
-            pieceMoves[-1].full_clean()
-        
-        image_db.save()
         piece.save()
+        pieceMoves = []
+        for move_pk, move_locs in moves.items():
+            move = Move.objects.get(pk=move_pk)
+            for drow, dcol in move_locs:
+                pieceMoves.append(PieceMove(
+                    relative_row=drow,
+                    relative_col=dcol,
+                    move=move,
+                    piece=piece,
+                ))
+                pieceMoves[-1].full_clean()
+        
         for move in pieceMoves:
             move.save()
         return piece
@@ -132,11 +113,22 @@ class PieceMove(models.Model):
         MaxValueValidator(7)
     ])
     move = models.ForeignKey(Move, on_delete=models.RESTRICT)
-    piece = models.ForeignKey(Piece, on_delete=models.CASCADE)
+    piece = models.ForeignKey(Piece, on_delete=models.CASCADE, related_name='piecemoves')
 
     class Meta:
         indexes = [models.Index(fields=['piece'])]
 
+class PieceMoveSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = PieceMove
+        fields = ['relative_row', 'relative_col', 'move']
+
+class PieceSerializer(serializers.ModelSerializer):
+    piecemoves = PieceMoveSerializer(many=True, read_only=True)
+    author = serializers.SlugRelatedField('username', read_only=True)
+    class Meta:
+        model = Piece
+        fields = ['image', 'author', 'cat', 'name', 'piecemoves']
 
 class BoardSetup(models.Model):
     name = models.CharField(max_length=31, unique=True)

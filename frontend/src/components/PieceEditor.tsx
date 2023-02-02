@@ -67,7 +67,7 @@ const PieceEditor: FC<PieceEditorProps> = ({ mouseDownState }) => {
     "color": [255, 255, 255],
     "implementation": "",
     "symbol": "\u232B",
-    "uid": -1,
+    "pk": -1,
   }]);
   const [selectedMove, selectMove] = useState<Move>(moves[0]);
   const [saveStatus, setSaveStatus] = useState<SaveState>("ok")
@@ -76,16 +76,16 @@ const PieceEditor: FC<PieceEditorProps> = ({ mouseDownState }) => {
       params: {}
     }).then((response) => {
       let new_moves = [...moves, ...response.data];
-      new_moves = _.uniqBy(new_moves, (move) => move.uid)
+      new_moves = _.uniqBy(new_moves, (move) => move.pk)
       new_moves.sort((a, b) => {
         return moveOrder(a) - moveOrder(b);
       })
       updateMoves(new_moves)
     })
   }, [saveStatus])
-  const uid_to_move = new Map<Number, Move>(); //Lookup key by move name
+  const pk_to_move = new Map<Number, Move>(); //Lookup key by move name
   _.forEach(moves, function (m: Move, ix: number) {
-    uid_to_move.set(m.uid, m);
+    pk_to_move.set(m.pk, m);
   });
 
   const toolChange: React.ChangeEventHandler<HTMLInputElement> = (e) => {
@@ -145,12 +145,12 @@ const PieceEditor: FC<PieceEditorProps> = ({ mouseDownState }) => {
           />
         </div>
         <div className='container mx-auto p-1' onContextMenu={(e) => e.preventDefault()}>
-          <MovesView moveGrid={moveGrid} changeMoveGrid={changeMoveGrid} selectedMove={selectedMove} mouseDownState={mouseDownState} uidToMove={uid_to_move} />
+          <MovesView moveGrid={moveGrid} changeMoveGrid={changeMoveGrid} selectedMove={selectedMove} mouseDownState={mouseDownState} pkToMove={pk_to_move} />
         </div>
         <div className='container mx-auto p-1'>
           {
             _.uniq(_.flatMap(moveGrid)).filter((x) => { return x != null }).map((moveName, idx) => {
-              const move = uid_to_move.get(moveName!)!;
+              const move = pk_to_move.get(moveName!)!;
               return <div className='inline-flex' key={idx}> <MoveIcon move={move}></MoveIcon>{move.overview}</div>;
             })
           }

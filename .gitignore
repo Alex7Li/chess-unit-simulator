@@ -25,3 +25,4 @@ dist-ssr
 __pycache__
 
 secret_key.txt
+media/pieces

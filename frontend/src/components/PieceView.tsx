@@ -10,17 +10,17 @@ interface PieceViewProps {
 interface MovesViewProps {
   moveGrid: MoveGrid;
   changeMoveGrid?: React.Dispatch<React.SetStateAction<MoveGrid>>;
-  uidToMove: Map<Number, Move>
+  pkToMove: Map<Number, Move>
   selectedMove?: Move
   mouseDownState?: Number
 }
 
-export const MovesView: FC<MovesViewProps> = ({ moveGrid, changeMoveGrid, selectedMove, mouseDownState, uidToMove}) => {
+export const MovesView: FC<MovesViewProps> = ({ moveGrid, changeMoveGrid, selectedMove, mouseDownState, pkToMove}) => {
   const editable = (changeMoveGrid !== undefined) && (selectedMove !== undefined) && (mouseDownState !== undefined)
   return (
     <div className="grid grid-cols-15 grid-rows-15 gap-x-0 w-75 h-75 border-gray-900 border-2 p-0 m-0">
       {moveGrid.map((moveLine, row) => {
-        return moveLine.map((moveUID, col) => {
+        return moveLine.map((movePK, col) => {
           const parity = (row + col) % 2 === 0 ? 'dark' : 'light';
           // Note: we need to include all class names in the code so that tailwind
           // sees that we are using them (can't do bg-grid_{parity})
@@ -34,9 +34,9 @@ export const MovesView: FC<MovesViewProps> = ({ moveGrid, changeMoveGrid, select
           if (row == 7 && col == 7) {
             inner_element = <div className="rounded-full"><FaceSmileIcon /></div>
           }
-          if (moveUID) {
+          if (movePK) {
             inner_element = <div className="-translate-y-0.5 -translate-x-0.5">
-              <MoveIcon move={uidToMove.get(moveUID)!} />
+              <MoveIcon move={pkToMove.get(movePK)!} />
               </div>
           }
           let handler_func:  React.MouseEventHandler<HTMLButtonElement> | undefined = undefined;
@@ -55,8 +55,8 @@ export const MovesView: FC<MovesViewProps> = ({ moveGrid, changeMoveGrid, select
                   newGrid[row][col] = null;
                   newGrid[row][15 - col - 1] = null;
                 } else {
-                  newGrid[row][col] = selectedMove.uid;
-                  newGrid[row][15 - col - 1] = selectedMove.uid;
+                  newGrid[row][col] = selectedMove.pk;
+                  newGrid[row][15 - col - 1] = selectedMove.pk;
                 }
                 changeMoveGrid(newGrid);
               }
