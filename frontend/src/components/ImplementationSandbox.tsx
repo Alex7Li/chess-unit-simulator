@@ -3,6 +3,7 @@ import Blockly from 'blockly';
 import {pythonGenerator} from 'blockly/python';
 
 interface ImplementationSandboxProps {
+  setImplementation : (implementation: string) => void
 }
 const toolbox = {
   "kind": "flyoutToolbox",
@@ -39,9 +40,10 @@ const toolbox = {
 }
 let workspace: undefined | Blockly.WorkspaceSvg = undefined
 
-export const ImplementationSandbox: FC<ImplementationSandboxProps> = ({}) => {
+export const ImplementationSandbox: FC<ImplementationSandboxProps> = ({setImplementation}) => {
   function onCodeChange() {
     const pythonCode = pythonGenerator.workspaceToCode(workspace);
+    setImplementation(pythonCode)
   }
   useEffect(() => {
     const container = document.getElementById('blocklyContainer')!

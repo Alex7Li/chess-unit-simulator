@@ -25,5 +25,5 @@ urlpatterns = [
     path('admin/', admin.site.urls),
     path('api/', include('api.urls')),
     re_path(r"^public/(?P<path>.*)$", serve, {"document_root": settings.STATIC_ROOT}), 
-    re_path(r"^.*$", TemplateView.as_view(template_name="base.html")),
+    re_path(r"^chess$", TemplateView.as_view(template_name="base.html")),
 ] + static(settings.MEDIA_URL, document_root=settings.MEDIA_ROOT)

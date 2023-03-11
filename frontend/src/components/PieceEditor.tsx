@@ -8,6 +8,7 @@ import MoveIcon from './MoveIcon'
 import { IntegerInput } from "./NumericInput"
 import { SaveElement, SaveState } from "./utils";
 import { api } from "../App"
+import { moveGridToMap } from './utils'
 
 const initMoveGrid: MoveGrid = Array.from({ length: 15 }).map(() => {
   return Array.from({ length: 15 }).map(() => {
@@ -99,14 +100,14 @@ const PieceEditor: FC<PieceEditorProps> = ({ mouseDownState }) => {
     setSaveStatus("saving");
     canvas.current?.exportImage('png').then(data => {
       console.log(data)
-      const creation: Piece = {
-        name: pieceName,
-        passives: "",
-        image: data,
-        moves: moveGrid,
-      }
       api.post('/pieces',
-        {params: {creation}}
+        {params: {
+          name: pieceName,
+          passives: "",
+          image: data,
+          moves: moveGridToMap(moveGrid),
+
+        }}
       ).then((response) => {
         setSaveStatus('ok');
       }).catch(() => {
@@ -139,7 +140,7 @@ const PieceEditor: FC<PieceEditorProps> = ({ mouseDownState }) => {
             eraserWidth={eraseWidth}
             canvasColor="white"
             strokeColor="black"
-            backgroundImage="src/assets/transparent.png"
+            backgroundImage="media/tile.png"
             exportWithBackgroundImage={true}
             ref={canvas}
           />
@@ -176,7 +177,7 @@ const PieceEditor: FC<PieceEditorProps> = ({ mouseDownState }) => {
                           <p className='h-0 w-fit whitespace-nowrap'>{selectedMove.name}(source, target):</p>
                         </label>
                       </div>
-                      <p>{selectedMove.implementation}</p>
+                      <pre>{selectedMove.implementation}</pre>
                     </>
                     : <></>}
                 </div>

@@ -68,14 +68,14 @@ class Piece(models.Model):
         OFFICIAL = 'official'
         CUSTOM = 'custom'
     cat = models.CharField(max_length=10, choices=Category.choices, default=Category.CUSTOM)
-    name = models.CharField(max_length=31, unique=True)
+    name = models.CharField(max_length=31)
 
     def __str__(self):
         return f"Piece: {self.name} by {self.author}"
 
     @staticmethod
     def create_piece(image: str, author: User,
-                     name: str, moves: Dict[int, List[Tuple[int, int]]],
+                     name: str, moves: List[Dict[str, int]],
                      cat: Category):
         # image is formated as 'data:image/png;base64,iVBOr==EGk'
         content_type, base64_data = image.split(',')
@@ -84,22 +84,25 @@ class Piece(models.Model):
         piece = Piece(author=author, name=name, cat=cat)
         image_data = File(BytesIO(base64.b64decode(base64_data)))
         piece.image.save(img_fpath, image_data, True)
-        piece.full_clean()
-        piece.save()
         pieceMoves = []
-        for move_pk, move_locs in moves.items():
-            move = Move.objects.get(pk=move_pk)
-            for drow, dcol in move_locs:
-                pieceMoves.append(PieceMove(
-                    relative_row=drow,
-                    relative_col=dcol,
-                    move=move,
-                    piece=piece,
-                ))
-                pieceMoves[-1].full_clean()
-        
-        for move in pieceMoves:
-            move.save()
+        for moveInfo in moves:
+            move = Move.objects.get(pk=moveInfo['move'])
+            pieceMoves.append(PieceMove(
+                relative_row=moveInfo['relative_row'],
+                relative_col=moveInfo['relative_col'],
+                move=move,
+                piece=piece,
+            ))
+        try:
+            piece.save()
+            for move in pieceMoves:
+                move.save()
+            piece.full_clean()
+            for i in range(len(pieceMoves)):
+                pieceMoves[i].full_clean()
+        except ValidationError as e:
+            piece.delete()
+            raise ValidationError(e)
         return piece
 
 
@@ -126,9 +129,11 @@ class PieceMoveSerializer(serializers.ModelSerializer):
 class PieceSerializer(serializers.ModelSerializer):
     piecemoves = PieceMoveSerializer(many=True, read_only=True)
     author = serializers.SlugRelatedField('username', read_only=True)
+    image = serializers.ImageField(max_length=None, use_url=True, allow_null=True, required=False)
+
     class Meta:
         model = Piece
-        fields = ['image', 'author', 'cat', 'name', 'piecemoves']
+        fields = ['pk', 'image', 'author', 'cat', 'name', 'piecemoves']
 
 class BoardSetup(models.Model):
     name = models.CharField(max_length=31, unique=True)

@@ -4,13 +4,14 @@ import { FaceSmileIcon } from '@heroicons/react/24/outline'
 import _ from 'lodash'
 import MoveIcon from './MoveIcon'
 interface PieceViewProps {
-  piece: Piece;
+  piece: Piece
+  pkToMove: {[index: number]: Move}
 }
 
 interface MovesViewProps {
   moveGrid: MoveGrid;
   changeMoveGrid?: React.Dispatch<React.SetStateAction<MoveGrid>>;
-  pkToMove: Map<Number, Move>
+  pkToMove: {[index: number]: Move}
   selectedMove?: Move
   mouseDownState?: Number
 }
@@ -36,7 +37,7 @@ export const MovesView: FC<MovesViewProps> = ({ moveGrid, changeMoveGrid, select
           }
           if (movePK) {
             inner_element = <div className="-translate-y-0.5 -translate-x-0.5">
-              <MoveIcon move={pkToMove.get(movePK)!} />
+              <MoveIcon move={pkToMove[movePK]} />
               </div>
           }
           let handler_func:  React.MouseEventHandler<HTMLButtonElement> | undefined = undefined;
@@ -72,23 +73,21 @@ export const MovesView: FC<MovesViewProps> = ({ moveGrid, changeMoveGrid, select
   );
 };
 
-const PieceView: FC<PieceViewProps> = ({ piece }) => {
+const PieceView: FC<PieceViewProps> = ({ piece, pkToMove }) => {
   return <div>
     <p>{piece.name}</p>
     <img draggable="false" src={piece.image} />
 
     <div className='container mx-auto p-1' onContextMenu={(e) => e.preventDefault()}>
-      {/* <MovesView moveGrid={piece.moves} /> */}
+      <MovesView moveGrid={piece.moves} pkToMove={pkToMove}/>
     </div>
     <div className='container mx-auto p-1'>
-      <p>TODO: Display the moves corresponding to the moves in the piece info.</p>
-      {/* 
       {
-        _.uniq(_.flatMap(piece.moves)).filter((x) => { return x != null }).map((moveName) => {
-          const move = NAME_TO_MOVE.get(moveName!)!;
-          return <div key={moveName} className='inline-flex'> <MoveIcon move={move}></MoveIcon>{move.overview}</div>;
+        _.uniq(_.flatMap(piece.moves)).filter((x) => { return x != null }).map((moveId) => {
+          const move = pkToMove[moveId!];
+          return <div key={moveId} className='inline-flex'> <MoveIcon move={move}></MoveIcon>{move.overview}</div>;
         })
-      } */}
+      }
     </div>
   </div>
 }

@@ -24,10 +24,22 @@ class TestCaseWithMockData(TestCase):
     def setUp(self):
         wb_user = User.objects.create_user('wolfblue', "7alex7li@gmail.com", "password")
         dan_user = User.objects.create_user('dan', "dan@gmail.com", "password")
-        move_official = Move.objects.create(author=wb_user, name="a_move", cat=Move.Category.OFFICIAL, color='[123,123,123]',implementation='', description='its the move', symbol='')
+        move_official = Move.objects.create(author=wb_user, name="a_move", cat=Move.Category.OFFICIAL, color='[123,123,123]',implementation='a b\nc', description='its the move', symbol='')
         dan_move = Move.objects.create(author=dan_user, name="b_move", cat=Move.Category.CUSTOM, color='[0,0,255]',implementation='', description='its the other move', symbol='XD')
-        piece_official = Piece.create_piece(image_bytes, wb_user, "king", {}, Piece.Category.OFFICIAL)
-        piece_official_2 = Piece.create_piece(image_bytes, dan_user, "mover", {move_official.pk: [(0, 1), (1, 1)]}, Piece.Category.OFFICIAL)
+        sample_moves = [
+            {
+            'relative_row': 0,
+            'relative_col': 1,
+            'move': move_official.pk
+            },
+            {
+            'relative_row': -1,
+            'relative_col': 0,
+            'move': move_official.pk
+            }
+        ]
+        piece_official = Piece.create_piece(image_bytes, wb_user, "king", [], Piece.Category.OFFICIAL)
+        piece_official_2 = Piece.create_piece(image_bytes, dan_user, "mover", sample_moves, Piece.Category.CUSTOM)
 
 class MovesTest(TestCaseWithMockData):
     def test_can_get_official_moves(self):
@@ -36,6 +48,7 @@ class MovesTest(TestCaseWithMockData):
         response = client.get('/api/moves')
         moves = response.json()
         self.assertEqual(len(moves), 1)
+        self.assertEqual(moves[0]['implementation'], 'a b\nc')
         self.assertEqual(moves[0]['color'], [123, 123, 123])
         self.assertEqual(response.status_code, 200)
 
@@ -62,19 +75,26 @@ class PiecesTest(TestCaseWithMockData):
         dan_move = Move.objects.get(('name', "b_move"))
         client = Client()
         client.force_login(User.objects.get(('username', 'dan')))
-        move_map = {
-            dan_move.pk: [[0, 1], [0, -1], [1, 0], [-1, 0]]
-        }
+        sample_moves = [
+            {
+            'relative_row': 0,
+            'relative_col': 1,
+            'move': dan_move.pk
+            },
+            {
+            'relative_row': -1,
+            'relative_col': 0,
+            'move': dan_move.pk
+            }
+        ]
         result = client.post('/api/pieces', {
+            'params': {
                 'name': 'rook',
-                'passives': '',
                 'image': image_bytes,
-                'moves': json.dumps(move_map)
-        })
+                'moves': sample_moves
+        }}, content_type='application/json')
         self.assertEqual(result.status_code, 201)
         piece = Piece.objects.get(('name', "rook"))
         pieceMove = PieceMove.objects.filter(('piece', piece.pk))
-        assert len(pieceMove) == 4
+        assert len(pieceMove) == 2
         assert pieceMove[0].move == dan_move
-        
-        

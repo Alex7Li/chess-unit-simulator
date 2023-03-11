@@ -9,6 +9,7 @@ import { SaveElement, SaveState } from "./utils";
 import { api } from "../App"
 import { ImplementationSandbox } from "./ImplementationSandbox";
 import { moveOrder, MoveSelect } from './PieceEditor'
+import { pythonGenerator } from 'blockly/python';
 
 
 interface MoveEditorProps {
@@ -26,7 +27,7 @@ const newMoveTemplate: Move = {
 }
 
 interface MoveSelectModalProps {
-  setSelectedMove: (move: Move) => null
+  setSelectedMove: (move: Move) => void
 }
 const MoveSelectModal: FC<MoveSelectModalProps> = ({setSelectedMove}) => {
   const [isShown, setShown] = useState<boolean>(false);
@@ -78,6 +79,7 @@ export const MoveEditor: FC<MoveEditorProps> = ({ }) => {
   }
 
   const saveMove = () => {
+
     setSaveStatus('saving')
     api.post("/moves", {}, {
       params: {
@@ -89,23 +91,35 @@ export const MoveEditor: FC<MoveEditorProps> = ({ }) => {
       setSaveStatus('fail')
     })
   }
-
-  function immutableUpdateMove(update: (value: string, m: Move) => void): React.ChangeEventHandler {
-    return (e) => {
-      let move_copy = _.clone(move)
-      // @ts-ignore
-      update(e.target.value, move_copy)
+  /**
+   * input: a function.
+   * output: a function that takes a value and applies the given function to the currently selected move.
+   */
+  function immutableUpdateMove(update: (value: string, m: Move) => void): (value: string) => void {
+    return (v) => {
+      const move_copy = _.clone(move)
+      update(v, move_copy)
       setMove(move_copy);
     }
   }
-  const updateMoveName = immutableUpdateMove((v, m) => m.name = v);
-  const updateMoveDescription = immutableUpdateMove((v, m) => m.description = v);
-  const updateMoveOverview = immutableUpdateMove((v, m) => m.overview = v);
-  const updateMoveSymbol = immutableUpdateMove((v, m) => m.symbol = v);
+  function immutableUpdateMoveFromHandler(update: (value: string, m: Move) => void): React.ChangeEventHandler {
+    const upd = immutableUpdateMove(update);
+    return (e) => {
+      // @ignore
+      upd(e.target.value);
+    }
+  }
+  
+  const updateMoveName = immutableUpdateMoveFromHandler((v, m) => m.name = v);
+  const updateMoveDescription = immutableUpdateMoveFromHandler((v, m) => m.description = v);
+  const updateMoveOverview = immutableUpdateMoveFromHandler((v, m) => m.overview = v);
+  const updateMoveSymbol = immutableUpdateMoveFromHandler((v, m) => m.symbol = v);
   const updateMoveImplementation = immutableUpdateMove((v, m) => m.implementation = v);
 
   const updateMoveColor = (color_index: number, new_value: number) => {
-    immutableUpdateMove((v, m) => move.color[color_index] = new_value)
+    const move_copy = _.clone(move)
+    move_copy.color[color_index] = new_value
+    setMove(move_copy);
   }
 
   return <div>
@@ -146,7 +160,7 @@ export const MoveEditor: FC<MoveEditorProps> = ({ }) => {
       </label>
       <ImplementationHelpModal />
     </div>
-    <ImplementationSandbox/>
+    <ImplementationSandbox setImplementation={updateMoveImplementation}/>
     <div className='inline-flex'>
       <Button onClick={saveMove}>Save</Button>
       <SaveElement savingState={saveStatus} />

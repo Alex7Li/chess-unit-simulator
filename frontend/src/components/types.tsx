@@ -17,12 +17,20 @@ export interface Move {
 
 export type MoveGrid = (number | null)[][];
 
+export type PieceMove = {
+  relative_row: number,
+  relative_col: number,
+  move: number,
+}
+// A map from the primary key of the move to all (dx, dy) where it applies
+export type MoveMap = Array<PieceMove>;
+
 export interface Piece {
   name: string; // max length 31
   image: string;
   moves: MoveGrid;
-  passives: string;
   author?: string;
+  pk: number; // max length 31
 }
 
-export type BoardSetup = (string | null)[][]
+export type BoardSetup = (number | null)[][]

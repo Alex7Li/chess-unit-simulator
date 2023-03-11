@@ -118,7 +118,8 @@ class Pieces(APIView):
         serialized_pieces = []
         all_move_pks = set()
         for piece in all_pieces:
-            serialized_pieces.append(PieceSerializer(piece).data)
+            piece_data = PieceSerializer(piece).data
+            serialized_pieces.append(piece_data)
             for move_pk in serialized_pieces[-1]['piecemoves']:
                 all_move_pks.add(move_pk['move'])
         move_pk_map = {
@@ -132,14 +133,17 @@ class Pieces(APIView):
     def post(self, request):
         """Create a new piece
         """
-        piece = request.data
+        piece = request.data['params']
         if not request.user.is_authenticated:
             return ResponseWithMessage("You must be logged in to save", status=status.HTTP_401_UNAUTHORIZED)
         user = User.objects.get(('id', request.user.id))
-        moves_dict = json.loads(piece['moves'])
-        Piece.create_piece(image=piece['image'], author=user, name=piece['name'],
-                           moves=moves_dict, cat=Piece.Category.CUSTOM)
-        return Response(status=status.HTTP_201_CREATED)
+        moves_dict = piece['moves']
+        try:
+            piece = Piece.create_piece(image=piece['image'], author=user, name=piece['name'],
+                       moves=moves_dict, cat=Piece.Category.CUSTOM)
+            return Response(status=status.HTTP_201_CREATED)
+        except ValidationError as e:
+            return ResponseWithMessage(e, status=status.HTTP_401_UNAUTHORIZED)
 
 if __name__ == "__main__":
     ...
