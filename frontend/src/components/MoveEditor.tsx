@@ -8,14 +8,15 @@ import { IntegerInput } from "./NumericInput"
 import { SaveElement, SaveState } from "./utils";
 import { api } from "../App"
 import { ImplementationSandbox } from "./ImplementationSandbox";
-import { moveOrder, MoveSelect } from './PieceEditor'
-import { pythonGenerator } from 'blockly/python';
+import { MoveSelect } from './PieceEditor'
 
+import { chessStore } from "../store";
 
 interface MoveEditorProps {
 
 }
-const newMoveTemplate: Move = {
+
+const newMoveTemplate = {
   "cat": "unmade",
   "name": "newMove",
   "overview": "Brief reminder of the ability.",
@@ -31,17 +32,13 @@ interface MoveSelectModalProps {
 }
 const MoveSelectModal: FC<MoveSelectModalProps> = ({setSelectedMove}) => {
   const [isShown, setShown] = useState<boolean>(false);
-  const [moves, updateMoves] = useState<Array<Move>>([newMoveTemplate]);
+  const moves = chessStore(state => state.moves)
+  const updateMoves = chessStore(state => state.updateMoves)
   useEffect(() => {
     api.get('/moves', {
       params: {}
     }).then((response) => {
-      let new_moves = [...moves, ...response.data];
-      new_moves = _.uniqBy(new_moves, (move) => move.pk)
-      new_moves.sort((a, b) => {
-        return moveOrder(a) - moveOrder(b);
-      })
-      updateMoves(new_moves)
+      updateMoves(response.data)
     })
   }, [isShown])
   return <div>
@@ -64,7 +61,6 @@ const MoveSelectModal: FC<MoveSelectModalProps> = ({setSelectedMove}) => {
     </Modal.Body>
   </Modal>
 </div>
-
 }
 
 export const MoveEditor: FC<MoveEditorProps> = ({ }) => {
@@ -77,6 +73,7 @@ export const MoveEditor: FC<MoveEditorProps> = ({ }) => {
     setMove(move);
     setEditMoveId(move.pk);
   }
+  const updateMoves = chessStore((store) => store.updateMoves)
 
   const saveMove = () => {
 
@@ -86,6 +83,7 @@ export const MoveEditor: FC<MoveEditorProps> = ({ }) => {
         newMove: move,
       }
     }).then((response) => {
+      updateMoves([response.data['new_move']])
       setSaveStatus('ok')
     }).catch((error) => {
       setSaveStatus('fail')
@@ -164,8 +162,8 @@ export const MoveEditor: FC<MoveEditorProps> = ({ }) => {
     <div className='inline-flex'>
       <Button onClick={saveMove}>Save</Button>
       <SaveElement savingState={saveStatus} />
+      <MoveSelectModal setSelectedMove={setSelectedMove}/>
     </div>
   </Card>
-    <MoveSelectModal setSelectedMove={setSelectedMove}/>
   </div>
 }

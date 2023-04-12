@@ -3,21 +3,21 @@ import { Piece, Move, MoveGrid } from './types'
 import { FaceSmileIcon } from '@heroicons/react/24/outline'
 import _ from 'lodash'
 import MoveIcon from './MoveIcon'
+import { chessStore } from "../store";
 interface PieceViewProps {
   piece: Piece
-  pkToMove: {[index: number]: Move}
 }
 
 interface MovesViewProps {
   moveGrid: MoveGrid;
   changeMoveGrid?: React.Dispatch<React.SetStateAction<MoveGrid>>;
-  pkToMove: {[index: number]: Move}
   selectedMove?: Move
-  mouseDownState?: Number
 }
 
-export const MovesView: FC<MovesViewProps> = ({ moveGrid, changeMoveGrid, selectedMove, mouseDownState, pkToMove}) => {
-  const editable = (changeMoveGrid !== undefined) && (selectedMove !== undefined) && (mouseDownState !== undefined)
+export const MovesView: FC<MovesViewProps> = ({ moveGrid, changeMoveGrid, selectedMove}) => {
+  const pkToMove = chessStore((state) => state.pkToMove)
+  const mouseDownState = chessStore((state) => state.mouseDownState)
+  const editable = (changeMoveGrid !== undefined) && (selectedMove !== undefined)
   return (
     <div className="grid grid-cols-15 grid-rows-15 gap-x-0 w-75 h-75 border-gray-900 border-2 p-0 m-0">
       {moveGrid.map((moveLine, row) => {
@@ -37,7 +37,7 @@ export const MovesView: FC<MovesViewProps> = ({ moveGrid, changeMoveGrid, select
           }
           if (movePK) {
             inner_element = <div className="-translate-y-0.5 -translate-x-0.5">
-              <MoveIcon move={pkToMove[movePK]} />
+              <MoveIcon move={pkToMove.get(movePK)!} />
               </div>
           }
           let handler_func:  React.MouseEventHandler<HTMLButtonElement> | undefined = undefined;
@@ -73,18 +73,18 @@ export const MovesView: FC<MovesViewProps> = ({ moveGrid, changeMoveGrid, select
   );
 };
 
-const PieceView: FC<PieceViewProps> = ({ piece, pkToMove }) => {
+const PieceView: FC<PieceViewProps> = ({ piece }) => {
+  const pkToMove = chessStore((state) => state.pkToMove)
   return <div>
-    <p>{piece.name}</p>
-    <img draggable="false" src={piece.image} />
+    <p className='inline-flex'><img draggable="false" src={piece.image_white} />{piece.name}</p>
 
     <div className='container mx-auto p-1' onContextMenu={(e) => e.preventDefault()}>
-      <MovesView moveGrid={piece.moves} pkToMove={pkToMove}/>
+      <MovesView moveGrid={piece.moves}/>
     </div>
     <div className='container mx-auto p-1'>
       {
         _.uniq(_.flatMap(piece.moves)).filter((x) => { return x != null }).map((moveId) => {
-          const move = pkToMove[moveId!];
+          const move = pkToMove.get(moveId!)!;
           return <div key={moveId} className='inline-flex'> <MoveIcon move={move}></MoveIcon>{move.overview}</div>;
         })
       }

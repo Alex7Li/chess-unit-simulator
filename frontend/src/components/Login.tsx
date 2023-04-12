@@ -1,14 +1,15 @@
 import React, { useState, useEffect } from 'react'
 import { api } from '../App'
 import { Label, TextInput, Button } from 'flowbite-react';
-
+import { chessStore } from '../store';
 
 export default function Login() {
-  let [username, setUsername] = useState('')
-  let [formUsername, setFormUsername] = useState('')
-  let [password, setPassword] = useState('')
-  let [email, setEmail] = useState('')
-  let [isSignup, setIsSignup] = useState(false)
+  const username = chessStore((state) => state.username)
+  const setUsername = chessStore((state) => state.setUsername)
+  const [formUsername, setFormUsername] = useState('')
+  const [password, setPassword] = useState('')
+  const [email, setEmail] = useState('')
+  const [isSignup, setIsSignup] = useState(false)
 
   useEffect(() => {
     api.get('/users', {
@@ -106,48 +107,3 @@ export default function Login() {
     </div>
   )
 }
-
-// interface GlobalState {
-//   mouseDownState: number;
-//   messages: Array<String>;
-//   user?: string
-// }
-// interface OptionalGlobalState {
-//   mouseDownState?: number;
-//   messages?: Array<String>;
-//   user?: string
-// }
-// const initialState: GlobalState = {
-//   'mouseDownState': 0,
-//   'messages': [],
-// };
-
-// const reducer = (state: GlobalState, newValue: OptionalGlobalState) => {
-//   if(newValue.user != undefined) {
-//     window.localStorage.setItem('user', JSON.stringify(state));
-//   }
-//   return { ...state, ...newValue };
-// };
-
-// const init = () => {
-//   let preloadedState;
-//   let preloadedStateStr =  window.localStorage.getItem('user');
-//   if(preloadedStateStr == undefined) {
-//     preloadedState = ""
-//   }else {
-//     preloadedState = JSON.parse(preloadedStateStr);
-//   }
-//   // TODO: validate preloadedState
-//   return {...preloadedState, ...initialState};
-// };
-
-// const useValue = () => {
-//   const [state, dispatch] = useReducer(reducer, null, init);
-//   return [state, dispatch];
-// };
-
-// const {
-//   Provider,
-//   useTracked,
-//   // ...
-// } = createContainer(useValue);

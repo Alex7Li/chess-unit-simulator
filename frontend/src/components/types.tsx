@@ -27,10 +27,30 @@ export type MoveMap = Array<PieceMove>;
 
 export interface Piece {
   name: string; // max length 31
-  image: string;
+  image_white: string;
+  image_black: string;
   moves: MoveGrid;
   author?: string;
   pk: number; // max length 31
 }
 
-export type BoardSetup = (number | null)[][]
+export interface BoardPosition {
+  piece_pk: number;
+  is_white: boolean;
+}
+
+export type PieceOnBoard = {
+  row: number;
+  col: number;
+  piece: number;
+  team: string;
+}
+export type PieceMap = Array<PieceOnBoard>
+export type BoardSetup = (BoardPosition | null)[][]
+export type BoardSetupMeta = {
+  author: string,
+  boardSetup: BoardSetup,
+  cat: string
+  name: string,
+  pk: number,
+}

@@ -6,8 +6,10 @@ import { MoveEditor } from './components/MoveEditor'
 import axios from 'axios';
 import { API_URL } from './components/definitions';
 import PieceEditor from './components/PieceEditor';
+import { GameSelectView } from './components/GameSelectView';
 import Login from './components/Login'
 import { ExclamationCircleIcon } from '@heroicons/react/24/outline'
+import { chessStore } from './store';
 
   // @ts-ignore
 const csrf_token: String = document.querySelector('[name=csrfmiddlewaretoken]')!.value;
@@ -18,16 +20,17 @@ export const api = axios.create({
 });
 
 const App: FC = () => {
-  const [mouseDownState, setMouseDownState] = useState(0);
+  const setMouseDownState = chessStore((state) => state.setMouseDownState)
   const onMouseDown: React.MouseEventHandler<HTMLDivElement> = (e) => {
     setMouseDownState(e.button)
   }
-  const [message, setMessage] = useState<String>("")
+  const message = chessStore((state) => state.errorMessage);
+  const setMessage = chessStore((state) => state.setErrorMessage);
 
   //https://reactjs.org/docs/code-splitting.html#reactlazy
   useEffect(() => {
     api.interceptors.response.use((response) => {
-      console.log(response);
+      console.info(response)
       return response
     },
       (error) => {
@@ -55,6 +58,7 @@ const App: FC = () => {
       </button>
     </div>
   </Alert>
+
   return (
     <div className="App" onMouseDown={onMouseDown} onMouseUp={() => setMouseDownState(-1)}>
       <div>
@@ -70,19 +74,19 @@ const App: FC = () => {
           <MoveEditor/>
         </Tabs.Item>
         <Tabs.Item title={<div className='inline-flex'>Piece Editor<HelpModal text="Create pieces to put on your boards here. You can draw a custom image with the tools and create custom move sets" /></div>}>
-          <PieceEditor mouseDownState={mouseDownState}></PieceEditor>
+          <PieceEditor></PieceEditor>
         </Tabs.Item>
         <Tabs.Item active={false}
           title={<div className='inline-flex'>Board Editor<HelpModal text="Welcome to the Board Editor! Here you can add pieces to a board to create a setup. To add a piece to the board, select it in the top menu and then select where you want to place it. To delete a piece, use the delete piece tool from the menu or right-click on the piece to delete. To inspect a piece that has been placed on the board, Ctrl+click or middle click on it." /></div>}
         >
           <BoardEditorView />
         </Tabs.Item>
-        <Tabs.Item  active={false} title={<div className='inline-flex'>Game<HelpModal
+        <Tabs.Item  active={false} title={<div className='inline-flex'>Lobby<HelpModal
           text="Play chess! The rules for how each piece move can be seen by clicking on it.
   The game ends when any one of your royal pieces are taken.
   If a player cannot move, they lose.
   There is no 3 fold repetition rule, players must agree to a draw.
-  "/></div>}></Tabs.Item>
+  "/></div>}><GameSelectView></GameSelectView></Tabs.Item>
       </Tabs.Group>
     </div>
   );

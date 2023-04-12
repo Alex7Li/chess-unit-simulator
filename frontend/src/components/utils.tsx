@@ -1,5 +1,5 @@
 import React, {FC} from "react";
-import { MoveGrid, MoveMap } from './types'
+import { MoveGrid, MoveMap, BoardSetup, PieceMap } from './types'
 export type SaveState ='saving'|'fail'|'ok' 
 
 interface SaveElementProps {
@@ -29,13 +29,11 @@ export const moveGridToMap = (grid: MoveGrid) => {
     for (let j = 0; j < 15; j++) {
       const value = grid[i][j];
       if (value != null) {
-        if(value in moveMap){
-          moveMap.push({
-            'relative_row': i - 7,
-            'relative_col': j - 7,
-            'move': value
-          })
-        }
+        moveMap.push({
+          'relative_row': i - 7,
+          'relative_col': j - 7,
+          'move': value
+        })
       }
     }
   }
@@ -52,4 +50,40 @@ export const moveMapToGrid = (moveMap: MoveMap) => {
     moveGrid[pieceMove.relative_row + 7][pieceMove.relative_col + 7] = pieceMove.move
   }
   return moveGrid;
+}
+
+
+export const boardSetupToMap = (grid: BoardSetup) => {
+  const moveMap: PieceMap = [];
+  console.assert(grid.length == 8)
+  console.assert(grid[0].length == 8)
+  for (let i = 0; i < 8; i++) {
+    for (let j = 0; j < 8; j++) {
+      const value = grid[i][j];
+      if (value != null) {
+        moveMap.push({
+          'row': i,
+          'col': j,
+          'piece': value.piece_pk,
+          'team': value.is_white ? 'white' : 'black'
+        })
+      }
+    }
+  }
+  return moveMap;
+}
+
+export const pieceMapToBoardSetup = (pieceMap: PieceMap) => {
+  const grid: BoardSetup = Array.from({ length: 8 }).map(() => {
+    return Array.from({ length: 8 }).map(() => {
+      return null
+    });
+  });
+  for (let piece of Object.values(pieceMap)) {
+    grid[piece.row][piece.col] = {
+      piece_pk: piece.piece,
+      is_white: piece.team == 'white'
+    }
+  }
+  return grid;
 }

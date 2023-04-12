@@ -21,6 +21,6 @@ class Migration(migrations.Migration):
         migrations.AlterField(
             model_name='piecemove',
             name='piece',
-            field=models.ForeignKey(on_delete=django.db.models.deletion.CASCADE, related_name='piecemoves', to='api.piece'),
+            field=models.ForeignKey(on_delete=django.db.models.deletion.CASCADE, related_name='piece_moves', to='api.piece'),
         ),
     ]

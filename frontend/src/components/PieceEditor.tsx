@@ -9,6 +9,7 @@ import { IntegerInput } from "./NumericInput"
 import { SaveElement, SaveState } from "./utils";
 import { api } from "../App"
 import { moveGridToMap } from './utils'
+import { chessStore } from "../store";
 
 const initMoveGrid: MoveGrid = Array.from({ length: 15 }).map(() => {
   return Array.from({ length: 15 }).map(() => {
@@ -16,15 +17,6 @@ const initMoveGrid: MoveGrid = Array.from({ length: 15 }).map(() => {
   });
 });
 
-export const moveOrder = (a: Move) => {
-  switch (a.cat) {
-    case "UI": return 0;
-    case "official": return 1;
-    case "custom": return 2;
-    case "unmade": return 3;
-    default: console.error("Got bad move category: " + a.cat); return 3;
-  }
-}
 
 interface MoveSelectProps {
   onClick: (move: Move) => void;
@@ -48,10 +40,9 @@ export const MoveSelect: FC<MoveSelectProps> = ({moves, onClick, highlightedMove
 
 }
 interface PieceEditorProps {
-  mouseDownState: number
 }
 
-const PieceEditor: FC<PieceEditorProps> = ({ mouseDownState }) => {
+const PieceEditor: FC<PieceEditorProps> = () => {
   const [strokeWidth, setStrokeWidth] = useState(4);
   const [eraseWidth, setEraseWidth] = useState(20);
   // const [color, setColor] = useState("black");
@@ -60,33 +51,31 @@ const PieceEditor: FC<PieceEditorProps> = ({ mouseDownState }) => {
   const [moveGrid, changeMoveGrid] = useState<MoveGrid>(initMoveGrid);
 
   // const [moves, updateMoves] = useState(MOVES);
-  const [moves, updateMoves] = useState<Array<Move>>([{
+  const moves_orig = chessStore(state => state.moves);
+  const moves = [{
     "cat": "UI",
+    "color": [255, 255, 255],
+    "implementation": "",
     "name": "cancel",
     "overview": "Use to delete an action. ",
     "description": "Delete an action you added before. Left click works as well.",
-    "color": [255, 255, 255],
-    "implementation": "",
     "symbol": "\u232B",
     "pk": -1,
-  }]);
+  }, ...moves_orig]
+  const updateMoves = chessStore(state => state.updateMoves)
   const [selectedMove, selectMove] = useState<Move>(moves[0]);
   const [saveStatus, setSaveStatus] = useState<SaveState>("ok")
+  const updatePieces = chessStore(state => state.updatePieces)
   useEffect(() => {
     api.get('/moves', {
       params: {}
     }).then((response) => {
-      let new_moves = [...moves, ...response.data];
-      new_moves = _.uniqBy(new_moves, (move) => move.pk)
-      new_moves.sort((a, b) => {
-        return moveOrder(a) - moveOrder(b);
-      })
-      updateMoves(new_moves)
+      updateMoves(response.data)
     })
   }, [saveStatus])
-  const pk_to_move = new Map<Number, Move>(); //Lookup key by move name
-  _.forEach(moves, function (m: Move, ix: number) {
-    pk_to_move.set(m.pk, m);
+  const pk_to_move: { [key: number]: Move } = {} //Lookup key by move name
+  _.forEach(moves, function (m: Move) {
+    pk_to_move[m.pk] = m;
   });
 
   const toolChange: React.ChangeEventHandler<HTMLInputElement> = (e) => {
@@ -99,23 +88,20 @@ const PieceEditor: FC<PieceEditorProps> = ({ mouseDownState }) => {
   const savePiece: React.MouseEventHandler<HTMLButtonElement> = (e) => {
     setSaveStatus("saving");
     canvas.current?.exportImage('png').then(data => {
-      console.log(data)
       api.post('/pieces',
         {params: {
           name: pieceName,
-          passives: "",
           image: data,
           moves: moveGridToMap(moveGrid),
-
         }}
       ).then((response) => {
+        updatePieces([response.data['new_piece']])
         setSaveStatus('ok');
       }).catch(() => {
         setSaveStatus('fail');
       })
     }).catch(e => {
       setSaveStatus('fail');
-      console.error(e);
     })
   }
   return (
@@ -140,18 +126,18 @@ const PieceEditor: FC<PieceEditorProps> = ({ mouseDownState }) => {
             eraserWidth={eraseWidth}
             canvasColor="white"
             strokeColor="black"
-            backgroundImage="media/tile.png"
-            exportWithBackgroundImage={true}
+            backgroundImage="media/tile_white.png"
+            exportWithBackgroundImage={false}
             ref={canvas}
           />
         </div>
         <div className='container mx-auto p-1' onContextMenu={(e) => e.preventDefault()}>
-          <MovesView moveGrid={moveGrid} changeMoveGrid={changeMoveGrid} selectedMove={selectedMove} mouseDownState={mouseDownState} pkToMove={pk_to_move} />
+          <MovesView moveGrid={moveGrid} changeMoveGrid={changeMoveGrid} selectedMove={selectedMove} pkToMove={pk_to_move} />
         </div>
         <div className='container mx-auto p-1'>
           {
             _.uniq(_.flatMap(moveGrid)).filter((x) => { return x != null }).map((moveName, idx) => {
-              const move = pk_to_move.get(moveName!)!;
+              const move = pk_to_move[moveName!];
               return <div className='inline-flex' key={idx}> <MoveIcon move={move}></MoveIcon>{move.overview}</div>;
             })
           }

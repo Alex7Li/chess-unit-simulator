@@ -4,7 +4,9 @@ from django.utils.decorators import method_decorator
 from rest_framework.views import APIView
 from rest_framework.response import Response
 from rest_framework import authentication, permissions, status
-from api.models import Move, Piece, to_color_string, PieceSerializer, MoveSerializer
+from api.models import Move, Piece, to_color_string, PieceSerializer, MoveSerializer, BoardSetup, BoardSetupSerializer, Game
+import random
+import string
 import json
 from django.contrib.auth.models import User
 from django.contrib.auth import authenticate, login, logout
@@ -98,7 +100,7 @@ class Moves(APIView):
         try:
             move.full_clean()
             move.save()
-            return Response(status=status.HTTP_201_CREATED)
+            return Response({'new_move': MoveSerializer(move).data}, status=status.HTTP_201_CREATED)
         except ValidationError as e:
             return ResponseWithMessage(e, status=status.HTTP_401_UNAUTHORIZED)
 
@@ -120,7 +122,7 @@ class Pieces(APIView):
         for piece in all_pieces:
             piece_data = PieceSerializer(piece).data
             serialized_pieces.append(piece_data)
-            for move_pk in serialized_pieces[-1]['piecemoves']:
+            for move_pk in piece_data['piece_moves']:
                 all_move_pks.add(move_pk['move'])
         move_pk_map = {
             move_pk: MoveSerializer(Move.objects.get(('pk', move_pk))).data for move_pk in all_move_pks
@@ -136,14 +138,85 @@ class Pieces(APIView):
         piece = request.data['params']
         if not request.user.is_authenticated:
             return ResponseWithMessage("You must be logged in to save", status=status.HTTP_401_UNAUTHORIZED)
-        user = User.objects.get(('id', request.user.id))
         moves_dict = piece['moves']
         try:
-            piece = Piece.create_piece(image=piece['image'], author=user, name=piece['name'],
+            piece = Piece.create_piece(image=piece['image'], author=request.user, name=piece['name'],
                        moves=moves_dict, cat=Piece.Category.CUSTOM)
-            return Response(status=status.HTTP_201_CREATED)
+            return Response({'new_piece': PieceSerializer(piece).data}, status.HTTP_201_CREATED)
+        except ValidationError as e:
+            return ResponseWithMessage(e, status=status.HTTP_401_UNAUTHORIZED)
+        
+class BoardSetups(APIView):
+    """
+    Initial board setups
+    """
+    def get(self, request, format=None):
+        """
+        Return a list of all boards.
+        """
+        official_boards = BoardSetup.objects.filter(cat=BoardSetup.Category.OFFICIAL)
+        user_boards = []
+        if request.user.is_authenticated:
+            user_boards = BoardSetup.objects.filter(author=request.user)
+        all_boards = official_boards.union(user_boards)
+        serialized_boards = []
+        all_piece_pks = set()
+        for board in all_boards:
+            board_data = BoardSetupSerializer(board).data
+            serialized_boards.append(board_data)
+            for piece_loc in board_data['piece_locations']:
+                all_piece_pks.add(piece_loc['piece'])
+        piece_pk_map = {
+            piece_pk: PieceSerializer(Piece.objects.get(('pk', piece_pk))).data for piece_pk in all_piece_pks
+        }
+        return JsonResponse({
+            'boards': serialized_boards,
+            'pieces': piece_pk_map
+        })
+
+    def post(self, request):
+        """Create a new board setup
+        """
+        board = request.data['params']
+        if not request.user.is_authenticated:
+            return ResponseWithMessage("You must be logged in to save", status=status.HTTP_401_UNAUTHORIZED)
+        try:
+            boardSetup = BoardSetup.create_board(author=request.user, name=board['name'],
+                                            pieces=board['piece_locations'], cat=BoardSetup.Category.CUSTOM)
+            return Response({'new_board_setups': BoardSetupSerializer(boardSetup).data},
+                            status=status.HTTP_201_CREATED)
         except ValidationError as e:
             return ResponseWithMessage(e, status=status.HTTP_401_UNAUTHORIZED)
 
-if __name__ == "__main__":
-    ...
+class Games(APIView):
+    def post(self, request):
+        """Does things depending on the parameter 'type'.
+
+        If the type is start_local_game: Request to start a new game against yourself.
+        """
+        if not request.user.is_authenticated:
+            return ResponseWithMessage("You must be logged in to play. Sorry, implementing features for guests is currently low priority.", status=status.HTTP_401_UNAUTHORIZED)
+        user = request.user
+        type = request.query_params.get('type')
+        if type == "start_local_game":
+            # Start a game against yourself
+            initial_piece_locations = request.query_params.get('piece_locations')
+            try:
+                boardSetup = BoardSetup.create_board(author=user, name=random_name,
+                                                pieces=initial_piece_locations, cat=BoardSetup.Category.GAME_IN_PROGRESS)
+                # game = 
+                return Response({'new_game': BoardSetupSerializer(boardSetup).data},
+                                status=status.HTTP_201_CREATED)
+            except ValidationError as e:
+                return ResponseWithMessage(e, status=status.HTTP_401_UNAUTHORIZED)
+        elif type == "make_move":
+            game = Game.objects.get('pk', request.query_params.get('game_pk'))
+            if game == None:
+                return ResponseWithMessage("Game does not exist", status=status.HTTP_404_NOT_FOUND)
+            from_piece_row = request.query_params.get('from_row')
+            from_piece_col = request.query_params.get('from_col')
+            to_piece_row = request.query_params.get('to_row')
+            to_piece_col = request.query_params.get('to_col')
+            game.make_move((from_piece_row, from_piece_col), (to_piece_row, to_piece_col))
+        else:
+            return ResponseWithMessage("Only local matches are supported right now", status=status.HTTP_501_NOT_IMPLEMENTED)
