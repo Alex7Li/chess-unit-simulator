@@ -1,0 +1,151 @@
+import json
+import random
+import requests
+
+from asgiref.sync import async_to_sync
+from channels.generic.websocket import WebsocketConsumer
+from django.core.exceptions import ValidationError
+
+from api.models import GameRequest, BoardSetup, GameRequestSerializer, Piece, PieceSerializer, PieceLocation, Game
+
+class LobbyConsumer(WebsocketConsumer):
+    def connect(self):
+        self.group_name = 'lobby'
+        async_to_sync(self.channel_layer.group_add)(
+            self.group_name, self.channel_name
+        )
+        self.accept()
+
+    def disconnect(self, close_code):
+        current_user = self.scope["user"]
+
+        # Remove all pending requests
+        open_requests = GameRequest.objects.filter(requesting_user=current_user)
+        deleted_ids = []
+        for request in open_requests:
+            request.delete()
+            deleted_ids.append(request.pk)
+
+        # Let the world know about the deletions
+        async_to_sync(self.channel_layer.group_send)(
+            self.group_name, {
+                "type": "send_to_socket",
+                "event_type": "delete_game",
+                "deleted_ids": deleted_ids,
+                "accepted_by": ""}
+        )
+
+        # Leave the group
+        async_to_sync(self.channel_layer.group_discard)(
+            self.group_name, self.channel_name
+        )
+
+    # Receive message from WebSocket
+    def receive(self, text_data):
+        data_json = json.loads(text_data)
+        type = data_json['event_type']
+        requesting_user = self.scope["user"]
+        if type == 'request_game':
+            board_pk = data_json["board_pk"]
+            board_setup = BoardSetup.objects.get(('pk', board_pk))
+            try:
+                request = GameRequest(requesting_user=requesting_user, board_setup=board_setup)
+                request.full_clean()
+                request.save()
+                board_piece_locs = PieceLocation.objects.filter(board_setup=request.board_setup)
+                piece_set = set()
+                for board_piece_loc in board_piece_locs:
+                    piece_set.add(board_piece_loc.piece)
+                piece_pk_map = {
+                    # int is not allowed for map keys in json data sometimes
+                    str(piece.pk): PieceSerializer(piece).data for piece in piece_set
+                    }
+                gameRequest = GameRequestSerializer(request).data
+                async_to_sync(self.channel_layer.group_send)(
+                    self.group_name, {
+                        "type": "send_to_socket",
+                        "event_type": "new_game",
+                        "request": gameRequest,
+                        "pieces": piece_pk_map}
+                )
+            except ValidationError as e:
+                self.send(text_data=json.dumps({
+                    "type": "fail",
+                    "message": "Could not send request" + str(e)
+                    }))
+        elif type == 'accept_game':
+            pk = data_json['request_pk']
+            try:
+                accepted_request = GameRequest.objects.get(('pk', pk))
+                accepted_request.delete()
+                # Figure out who goes first
+                coin_flip = random.random() < .5
+                white = requesting_user if coin_flip else accepted_request.requesting_user
+                black = requesting_user if not coin_flip else accepted_request.requesting_user
+                # Create the game in the database
+                new_game = Game.create_game(white, black, accepted_request.board_setup)
+                # Let everyone know this request was taken
+                async_to_sync(self.channel_layer.group_send)(
+                    self.group_name, {
+                        "type": "send_to_socket",
+                        "event_type": "delete_game",
+                        "deleted_ids": [pk], 
+                        "white_player": white.username,
+                        "black_player": black.username,
+                        "game_id": new_game.pk
+                    }
+                )
+            except (ValueError, GameRequest.DoesNotExist):
+                self.send(text_data=json.dumps({
+                    "message": f"This request no longer exists",
+                    "event_type": "fail",
+                    }))
+
+    # Receive message from room group
+    def send_to_socket(self, event):
+        event['whoami'] = self.scope['user'].username
+        # Send message to WebSocket
+        self.send(text_data=json.dumps(event))
+
+
+class GameConsumer(WebsocketConsumer):
+    def connect(self):
+        self.game_id = self.scope["url_route"]["kwargs"]["game_id"]
+        self.group_name = f'game_{self.game_id}'
+        async_to_sync(self.channel_layer.group_add)(
+            self.group_name, self.channel_name
+        )
+        self.accept()
+
+    def disconnect(self, close_code):
+        pass
+
+    # Receive message from WebSocket
+    def receive(self, text_data):
+        text_data_json = json.loads(text_data)
+        requesting_user = self.scope["user"]
+        game = Game.objects.get(('pk', self.game_id))
+        from_loc = tuple(text_data_json['from_loc'])
+        to_loc = tuple(text_data_json['to_loc'])
+        if (game.make_move(from_loc, to_loc)):
+            # Successful move
+            async_to_sync(self.channel_layer.group_send)(
+                self.group_name,
+                {
+                "type": "send_to_socket",
+                "event_type": "board_update",
+                "game_state": game.game_state,
+                "white_to_move": game.white_to_move}
+            )
+        else:
+            # Move is not valid
+            self.send(text_data=json.dumps({
+                "event_type": "invalid_move",
+                "message": "You cannot move that piece to that location."
+                }))
+
+    # Receive message from room group
+    def send_to_socket(self, event):
+        event['whoami'] = self.scope['user'].username
+        # Send message to WebSocket
+        self.send(text_data=json.dumps(event))

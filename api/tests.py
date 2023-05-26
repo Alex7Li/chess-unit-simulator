@@ -1,15 +1,30 @@
-from django.test import TestCase, Client, override_settings
-from django.test import Client
-from api.models import Move, Piece, PieceMove, BoardSetup, PieceLocation
-from django.contrib.auth.models import User
+#python3 manage.py test
+#or f5 if you set it up your .vscode/launch.json right
+# Make sure you start redis and the convert_code_server.ts first. (See README.md)
 import tempfile
+import json
 import shutil
 
+from asgiref.sync import async_to_sync
+from channels.testing import WebsocketCommunicator
+from channels.routing import URLRouter
+from django.test import TestCase, Client, override_settings
+from django.test import Client
+
+from api.consumers import LobbyConsumer, GameConsumer
+from api.routing import websocket_urlpatterns
+from api.models import User, Move, Piece, PieceMove, BoardSetup, PieceLocation, Game
 # Create your tests here.
 
 image_bytes = 'data:image/png;base64,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'
-
+move_implementation = {"blocks": {"languageVersion": 0, "blocks": [{"type": "chess_action", "id": "`8DRg_aD7uEOo{L?xIXd", "x": 137, "y": 52, "inputs": {"ACTION": {"block": {"type": "move", "id": "S5kX9!cc`[Weq+@;23GT", "inputs": {"FROM_UNIT": {"block": {"type": "acting_unit", "id": "8IZ.zuq_o3fB_EYrd|r5"}}, "TO_TILE": {"block": {"type": "targeted_tile", "id": "^!!!^cr){Mn?=xSH#6Ao"}}}}}}}]}}
 MOCK_MEDIA_ROOT = tempfile.mkdtemp()
+
+class AuthWebsocketCommunicator(WebsocketCommunicator):
+    def __init__(self, path, headers=None, subprotocols=None, user=None):
+        super(AuthWebsocketCommunicator, self).__init__(URLRouter(websocket_urlpatterns), path, headers, subprotocols)
+        if user is not None:
+            self.scope['user'] = user
 
 @override_settings(MEDIA_ROOT=MOCK_MEDIA_ROOT)
 class TestCaseWithMockData(TestCase):
@@ -19,54 +34,62 @@ class TestCaseWithMockData(TestCase):
         super().tearDownClass()
 
     def setUp(self):
-        wb_user = User.objects.create_user('wolfblue', "7alex7li@gmail.com", "password")
-        dan_user = User.objects.create_user('dan', "dan@gmail.com", "password")
-        move_official = Move.objects.create(author=wb_user, name="a_move", cat=Move.Category.OFFICIAL, color='[123,123,123]',implementation='a b\nc', description='its the move', symbol='')
-        dan_move = Move.objects.create(author=dan_user, name="b_move", cat=Move.Category.CUSTOM, color='[0,0,255]',implementation='', description='its the other move', symbol='XD')
+        self.wolf_user = User.objects.create_user('wolfblue', "7alex7li@gmail.com", "password")
+        self.dan_user = User.objects.create_user('dan', "dan@gmail.com", "password")
+        self.move_official = Move.objects.create(author=self.wolf_user, name="a_move", cat=Move.Category.OFFICIAL, color='[123,123,123]',implementation=move_implementation, description='its the move', symbol='')
+        self.dan_move = Move.objects.create(author=self.dan_user, name="b_move", cat=Move.Category.CUSTOM, color='[0,0,255]',implementation=move_implementation, description='its the other move', symbol='XD')
         sample_moves = [
             {
-            'relative_row': 0,
-            'relative_col': 1,
-            'move': move_official.pk
+            'relative_row': 1,
+            'relative_col': 0,
+            'move': self.move_official.pk
+            }
+        ]
+        sample_moves_2 = [
+            {
+            'relative_row': 1,
+            'relative_col': 0,
+            'move': self.move_official.pk
             },
             {
             'relative_row': -1,
             'relative_col': 0,
-            'move': dan_move.pk
+            'move': self.dan_move.pk
             }
         ]
-        piece_official = Piece.create_piece(image_bytes, wb_user, "king", [], Piece.Category.OFFICIAL)
-        piece_official_2 = Piece.create_piece(image_bytes, dan_user, "mover", sample_moves, Piece.Category.CUSTOM)
+        self.piece_official = Piece.create_piece(image_bytes, self.wolf_user, "king", sample_moves, Piece.Category.OFFICIAL)
+        self.piece_official_2 = Piece.create_piece(image_bytes, self.dan_user, "mover", sample_moves_2, Piece.Category.CUSTOM)
         piece_locations = [
             {
                 'row': 0,
                 'col': 0,
-                'piece': piece_official.pk,
+                'piece': self.piece_official.pk,
                 'team': 'white'
             },
             {
-                'row': 7,
-                'col': 7,
-                'piece': piece_official_2.pk,
+                'row': 3,
+                'col': 0,
+                'piece': self.piece_official_2.pk,
                 'team': 'black'
             }
         ]
-        BoardSetup.create_board(wb_user, "sample", piece_locations, BoardSetup.Category.OFFICIAL)
+        self.sample_board = BoardSetup.create_board(self.wolf_user, "sample", piece_locations, BoardSetup.Category.OFFICIAL)
+        self.sample_game = Game.create_game(self.wolf_user, self.dan_user, self.sample_board)
 
 class MovesTest(TestCaseWithMockData):
     def test_can_get_official_moves(self):
         client = Client()
-        client.force_login(User.objects.get(('username', 'wolfblue')))
+        client.force_login(self.wolf_user)
         response = client.get('/api/moves')
         moves = response.json()
         self.assertEqual(len(moves), 1)
-        self.assertEqual(moves[0]['implementation'], 'a b\nc')
+        self.assertEqual(moves[0]['implementation'], move_implementation)
         self.assertEqual(moves[0]['color'], [123, 123, 123])
         self.assertEqual(response.status_code, 200)
 
     def test_can_get_custom_moves(self):
         client = Client()
-        client.force_login(User.objects.get(('username', 'dan')))
+        client.force_login(self.dan_user)
         response = client.get('/api/moves')
         moves = response.json()
         self.assertEqual(len(moves), 2)
@@ -75,13 +98,13 @@ class MovesTest(TestCaseWithMockData):
 class PiecesTest(TestCaseWithMockData):
     def test_get_piece(self):
         client = Client()
-        client.force_login(User.objects.get(('username', 'dan')))
+        client.force_login(self.dan_user)
         response = client.get('/api/pieces', {})
         data = response.json()
         assert len(data['pieces']) == 2
         for piece in data['pieces']:
             if piece['name'] == 'king':
-                assert len(piece['piece_moves']) == 0
+                assert len(piece['piece_moves']) == 1
             if piece['name'] == 'mover':
                 assert len(piece['piece_moves']) == 2
         assert len(data['move_map']) == 2
@@ -89,19 +112,18 @@ class PiecesTest(TestCaseWithMockData):
 
 
     def test_create_piece(self):
-        dan_move = Move.objects.get(('name', "b_move"))
         client = Client()
-        client.force_login(User.objects.get(('username', 'dan')))
+        client.force_login(self.dan_user)
         sample_moves = [
             {
             'relative_row': 0,
             'relative_col': 1,
-            'move': dan_move.pk
+            'move': self.dan_move.pk
             },
             {
             'relative_row': -1,
             'relative_col': 0,
-            'move': dan_move.pk
+            'move': self.dan_move.pk
             }
         ]
         result = client.post('/api/pieces', {
@@ -114,17 +136,18 @@ class PiecesTest(TestCaseWithMockData):
         piece = Piece.objects.get(('name', "rook"))
         pieceMove = PieceMove.objects.filter(('piece', piece.pk))
         assert len(pieceMove) == 2
-        assert pieceMove[0].move == dan_move
+        assert pieceMove[0].move == self.dan_move
 
 class BoardSetupTest(TestCaseWithMockData):
     def test_get_board(self):
         client = Client()
+        client.force_login(self.dan_user)
         response = client.get('/api/pieces', {})
         data = response.json()
         assert len(data['pieces']) == 2
         for piece in data['pieces']:
             if piece['name'] == 'king':
-                assert len(piece['piece_moves']) == 0
+                assert len(piece['piece_moves']) == 1
             if piece['name'] == 'mover':
                 assert len(piece['piece_moves']) == 2
         assert len(data['move_map']) == 2
@@ -132,9 +155,9 @@ class BoardSetupTest(TestCaseWithMockData):
 
 
     def test_create_board(self):
-        piece = Piece.objects.get(('name', "mover"))
+        piece = self.piece_official_2
         client = Client()
-        client.force_login(User.objects.get(('username', 'dan')))
+        client.force_login(self.dan_user)
         piece_locations = [
             {
                 'row': 0,
@@ -143,8 +166,8 @@ class BoardSetupTest(TestCaseWithMockData):
                 'team': 'white'
             },
             {
-                'row': 7,
-                'col': 7,
+                'row': 0,
+                'col': 3,
                 'piece': piece.pk,
                 'team': 'black'
             }
@@ -158,5 +181,117 @@ class BoardSetupTest(TestCaseWithMockData):
         boards = BoardSetup.objects.filter(('name', 'sampleSetup'))
         assert len(boards) == 1
         board = boards[0]
-        pieceLoc = PieceLocation.objects.filter(('boardSetup', board))
+        pieceLoc = PieceLocation.objects.filter(('board_setup', board))
         assert len(pieceLoc) == len(piece_locations)
+
+class LobbyTest(TestCaseWithMockData):
+    async def test_lobby_consumer(self):
+        communicator_wolf = AuthWebsocketCommunicator("/ws/lobby/", user=self.wolf_user)
+        communicator_dan = AuthWebsocketCommunicator("/ws/lobby/", user=self.dan_user)
+        connected, _ = await communicator_dan.connect()
+        assert connected
+        connected, _ = await communicator_wolf.connect()
+        assert connected
+        # 1) Dan requests a new game
+        await communicator_dan.send_json_to({
+            'event_type': 'request_game',
+            'board_pk': self.sample_board.pk
+        })
+        response = await communicator_dan.receive_from()
+        response_json = json.loads(response)
+        request_pk = response_json['request']['pk']
+        assert response_json['event_type'] == 'new_game'
+        assert response_json['request']['requesting_user'] == 'dan'
+        assert response_json['request']['board_setup']['name'] == self.sample_board.name
+        assert response_json['request']['board_setup']['pk'] == self.sample_board.pk
+        assert len(response_json['pieces']) == 2
+        # 2) wolf sees that the game is posted
+        wolf_alert = await communicator_wolf.receive_from()
+        response_json = json.loads(wolf_alert)
+        assert response_json['event_type'] == 'new_game'
+        assert response_json['request']['requesting_user'] == 'dan'
+        assert response_json['request']['board_setup']['name'] == self.sample_board.name
+        assert response_json['request']['board_setup']['pk'] == self.sample_board.pk
+        assert len(response_json['pieces']) == 2
+        # 3) wolf joins the game!
+        await communicator_wolf.send_json_to({
+            'event_type': 'accept_game',
+            'request_pk':  request_pk
+        })
+        wolf_alert = await communicator_wolf.receive_from()
+        response_json = json.loads(wolf_alert)
+        assert response_json['event_type'] == 'delete_game'
+        assert response_json['deleted_ids'] == [request_pk]
+        orig_white = response_json['white_player']
+        # 4) If wolf sends the request twice, it only accepts once
+        await communicator_wolf.send_json_to({
+            'event_type': 'accept_game',
+            'request_pk':  request_pk
+        })
+        wolf_alert = await communicator_wolf.receive_from()
+        response_json = json.loads(wolf_alert)
+        assert response_json['event_type'] == 'fail'
+        assert response_json['message'] != ""
+        # 5) Dan learns that wolf has joined the game
+        dan_alert = await communicator_dan.receive_from()
+        response_json = json.loads(dan_alert)
+        assert response_json['event_type'] == 'delete_game'
+        assert response_json['deleted_ids'] == [request_pk]
+        assert response_json['white_player'] == orig_white # same white player
+        await communicator_wolf.send_json_to({
+            'event_type': 'accept_game',
+            'request_pk':  request_pk
+        })
+        await communicator_wolf.disconnect()
+        await communicator_dan.disconnect()
+
+class GameTest(TestCaseWithMockData):
+    async def test_move_forwards(self):
+        game_pk = self.sample_game.pk
+        communicator_wolf = AuthWebsocketCommunicator(f"/ws/game/{game_pk}/", user=self.wolf_user)
+        communicator_dan = AuthWebsocketCommunicator(f"/ws/game/{game_pk}/", user=self.dan_user)
+        connected, _ = await communicator_dan.connect()
+        assert connected
+        connected, _ = await communicator_wolf.connect()
+        
+        await communicator_wolf.send_json_to({
+            'from_loc': [0, 0],
+            'to_loc': [1, 0]
+        })
+        # One move as white
+        wolf_alert = await communicator_wolf.receive_from()
+        dan_alert = await communicator_dan.receive_from()
+        response_json = json.loads(wolf_alert)
+        response_json['whoami'] = 'dan'
+        assert json.loads(dan_alert) == response_json
+        assert len(response_json['game_state']['board']) == 64
+        assert response_json['game_state']['board']["0,0"]['piece'] is None
+        assert response_json['game_state']['board']["1,0"]['piece'] is not None
+        
+        # One move as black
+        assert response_json['game_state']['board']["3,0"]['piece'] is not None
+        assert response_json['game_state']['board']["2,0"]['piece'] is None
+
+        await communicator_dan.send_json_to({
+            'from_loc': [3, 0],
+            'to_loc': [2, 0]
+        })
+        dan_alert = await communicator_dan.receive_from()
+        wolf_alert = await communicator_wolf.receive_from()
+        response_json = json.loads(wolf_alert)
+        response_json['whoami'] = 'dan'
+        assert json.loads(dan_alert) == response_json
+        assert response_json['game_state']['board']["3,0"]['piece'] is None
+        assert response_json['game_state']['board']["2,0"]['piece'] is not None
+
+        # One invalid move as white
+        await communicator_wolf.send_json_to({
+            'from_loc': [1, 0],
+            'to_loc': [2, 0]
+        })
+        wolf_alert = await communicator_wolf.receive_from()
+        response_json = json.loads(wolf_alert)
+        assert response_json['event_type'] == "invalid_move"
+
+        await communicator_wolf.disconnect()
+        await communicator_dan.disconnect()

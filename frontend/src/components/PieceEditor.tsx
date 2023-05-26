@@ -9,7 +9,10 @@ import { IntegerInput } from "./NumericInput"
 import { SaveElement, SaveState } from "./utils";
 import { api } from "../App"
 import { moveGridToMap } from './utils'
-import { chessStore } from "../store";
+import { chessStore, updatePieces } from "../store";
+import {pythonGenerator} from '../blockly';
+import { fetchMoves } from "../networking";
+import { ImplementationSandbox } from "./ImplementationSandbox";
 
 const initMoveGrid: MoveGrid = Array.from({ length: 15 }).map(() => {
   return Array.from({ length: 15 }).map(() => {
@@ -23,6 +26,7 @@ interface MoveSelectProps {
   moves: Array<Move>;
   highlightedMove?: Move,
 }
+
 export const MoveSelect: FC<MoveSelectProps> = ({moves, onClick, highlightedMove}) => {
   return <div className="grid grid-cols-10 w-80">
     <>
@@ -50,28 +54,21 @@ const PieceEditor: FC<PieceEditorProps> = () => {
   const [pieceName, setPieceName] = useState<string>('');
   const [moveGrid, changeMoveGrid] = useState<MoveGrid>(initMoveGrid);
 
-  // const [moves, updateMoves] = useState(MOVES);
-  const moves_orig = chessStore(state => state.moves);
+  const moves_orig = chessStore(state => state.userMoves);
   const moves = [{
     "cat": "UI",
     "color": [255, 255, 255],
-    "implementation": "",
+    "implementation": null,
     "name": "cancel",
     "overview": "Use to delete an action. ",
     "description": "Delete an action you added before. Left click works as well.",
     "symbol": "\u232B",
     "pk": -1,
   }, ...moves_orig]
-  const updateMoves = chessStore(state => state.updateMoves)
   const [selectedMove, selectMove] = useState<Move>(moves[0]);
   const [saveStatus, setSaveStatus] = useState<SaveState>("ok")
-  const updatePieces = chessStore(state => state.updatePieces)
   useEffect(() => {
-    api.get('/moves', {
-      params: {}
-    }).then((response) => {
-      updateMoves(response.data)
-    })
+    fetchMoves()
   }, [saveStatus])
   const pk_to_move: { [key: number]: Move } = {} //Lookup key by move name
   _.forEach(moves, function (m: Move) {
@@ -149,25 +146,21 @@ const PieceEditor: FC<PieceEditorProps> = () => {
           <Tabs.Item title="Actions">
             <MoveSelect onClick={(move: Move) => selectMove(move)} moves={moves} highlightedMove={selectedMove}/>
             <Card>
+              <label>
+                <p className='h-0 w-fit whitespace-nowrap'>{selectedMove.name}</p>
+              </label>
               <div className="grid grid-cols-12">
                 <div className='col-span-1'>
                   <MoveIcon move={selectedMove} />
                 </div>
-                <p className="px-1 mx-0.5 col-span-4 text-m h-18">{selectedMove.overview}</p>
-                <p className="px-2 mx-0.5 col-span-7 text-m h-18">{selectedMove.description}</p>
-                <div>
-                  {selectedMove.implementation ?
-                    <>
-                      <div className="inline-flex">
-                        <label className='flex'>
-                          <p className='h-0 w-fit whitespace-nowrap'>{selectedMove.name}(source, target):</p>
-                        </label>
-                      </div>
-                      <pre>{selectedMove.implementation}</pre>
-                    </>
-                    : <></>}
-                </div>
+                <p className="px-1 mx-0.5 col-span-7 text-m h-18">{selectedMove.overview}</p>
               </div>
+              <p className="px-2 mx-0.5 col-span-7 text-m h-18">{selectedMove.description}</p>
+              {selectedMove.implementation ?
+                <div id="blocklyAreaPieceEditor" className="min-w-full" style={{"height": '20rem'}}>
+                  <ImplementationSandbox onCodeChange={null} divId="blocklyAreaPieceEditor" readOnly={true} initialState={selectedMove.implementation}/>
+                </div>
+                : <></>}
             </Card>
           </Tabs.Item>
           {/* Drawing Tools */}

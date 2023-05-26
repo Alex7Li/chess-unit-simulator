@@ -20,7 +20,14 @@ module.exports = {
       spacing: {
         '60': '15rem',
         '75': '18.75rem',
+      },
+      height: {
+        '98': '24.5rem',
+      },
+      width: {
+        '98': '24.5rem',
       }
+
     },
   },
   plugins: [require('flowbite/plugin')],

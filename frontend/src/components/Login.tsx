@@ -34,6 +34,9 @@ export default function Login() {
         }
       }).then(() => {
         setUsername(formUsername)
+        // TODO: here, login, logout
+        // refresh so that django login is registered
+        window.location.reload();
       })
     }
   }
@@ -47,10 +50,18 @@ export default function Login() {
       }
     }).then(() => {
       setUsername(formUsername)
+      window.location.reload();
     })
   }
   const logout_func: React.MouseEventHandler<HTMLButtonElement> = (e) => {
-    api.delete('/users').then(() => setUsername(''))
+    api.post('/users', null, {
+      params: {
+        type: 'logout'
+      }
+    }).then(() => {
+      setUsername('')
+      window.location.reload();
+    })
   }
   const login_comp = <div className="flex flex-col gap-4 p-2">{isSignup ? <div>
       <div className="mb-2 block">
@@ -99,6 +110,7 @@ export default function Login() {
       />
     </div>
     <div className="flex p-2 m-2">
+      When you login/out, the page will need to refresh.
       <Button onClick={login_func}>Login</Button><Button onClick={signup_func}>Sign up</Button></div></div>;
   const logout_comp = <div>Logged in as {username} <button onClick={logout_func}> Logout</button></div>
   return (

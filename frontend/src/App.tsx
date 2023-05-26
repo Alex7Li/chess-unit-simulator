@@ -6,10 +6,11 @@ import { MoveEditor } from './components/MoveEditor'
 import axios from 'axios';
 import { API_URL } from './components/definitions';
 import PieceEditor from './components/PieceEditor';
-import { GameSelectView } from './components/GameSelectView';
+import { Lobby } from './components/Lobby';
 import Login from './components/Login'
 import { ExclamationCircleIcon } from '@heroicons/react/24/outline'
 import { chessStore } from './store';
+import { GameView } from './components/GameView';
 
   // @ts-ignore
 const csrf_token: String = document.querySelector('[name=csrfmiddlewaretoken]')!.value;
@@ -26,6 +27,7 @@ const App: FC = () => {
   }
   const message = chessStore((state) => state.errorMessage);
   const setMessage = chessStore((state) => state.setErrorMessage);
+  const games = chessStore((state) => state.games);
 
   //https://reactjs.org/docs/code-splitting.html#reactlazy
   useEffect(() => {
@@ -70,6 +72,13 @@ const App: FC = () => {
         style="underline"
         className='m-0 p-0'
       >
+        <Tabs.Item  active={false} title={<div className='inline-flex'>Lobby<HelpModal
+          text="Lobby to create games and join games made by other players."/></div>}><Lobby></Lobby></Tabs.Item>
+        {
+          games.map((game) => {
+            return <Tabs.Item  active={false} title={game.board_setup_meta.name}><GameView game_info={game}></GameView></Tabs.Item>
+          })
+        }
         <Tabs.Item title={<div className='inline-flex'>Move Editor<HelpModal text="Create custom moves to add to your pieces!" /></div>}>
           <MoveEditor/>
         </Tabs.Item>
@@ -81,12 +90,6 @@ const App: FC = () => {
         >
           <BoardEditorView />
         </Tabs.Item>
-        <Tabs.Item  active={false} title={<div className='inline-flex'>Lobby<HelpModal
-          text="Play chess! The rules for how each piece move can be seen by clicking on it.
-  The game ends when any one of your royal pieces are taken.
-  If a player cannot move, they lose.
-  There is no 3 fold repetition rule, players must agree to a draw.
-  "/></div>}><GameSelectView></GameSelectView></Tabs.Item>
       </Tabs.Group>
     </div>
   );

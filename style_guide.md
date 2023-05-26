@@ -1,0 +1,3 @@
+- js variable names are in camelCase
+- python variable names are in snake_case
+- data variable names sent between python and js remain in snake_case.

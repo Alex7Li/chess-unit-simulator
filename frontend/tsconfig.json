@@ -16,6 +16,6 @@
     "noEmit": true,
     "jsx": "react-jsx"
   },
-  "include": ["src"],
+  "include": ["src", "../convert_code/convert_code.ts"],
   "references": [{ "path": "./tsconfig.node.json" }]
 }

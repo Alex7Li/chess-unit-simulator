@@ -3,7 +3,6 @@ from .views import Pieces, Moves, Users, documentation, BoardSetups, Games
 
 urlpatterns = [
     path('users', Users.as_view()),
-    path('games', BoardSetups.as_view()),
     path('boardSetups', BoardSetups.as_view()),
     path('pieces', Pieces.as_view()),
     path('moves', Moves.as_view()),

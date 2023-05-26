@@ -7,7 +7,7 @@ import PieceView from './PieceView';
 import { boardSetupToMap, moveMapToGrid } from './utils'
 import { SaveElement, SaveState } from "./utils";
 import { Button, TextInput } from "flowbite-react"
-import { chessStore } from '../store';
+import { chessStore, updatePieces } from '../store';
 
 interface BoardEditorProps {
   boardSetup: BoardSetup;
@@ -40,7 +40,7 @@ const PiecesView: FC<PiecesViewProps> = ({ selectedPiece, setSelectedPiece, piec
   </div>
 }
 
-export const BoardEditor: FC<BoardEditorProps> = ({ locToHandler, boardSetup }) => {
+export const BoardEditor: FC<BoardEditorProps> = ({ locToHandler, boardSetup}) => {
   const pkToPiece = chessStore((state) => state.pkToPiece)
   return <div className="grid grid-cols-8 grid-rows-8 gap-x-0 w-96 border-gray-900 border-2 p-0 m-0"
     onContextMenu={(e) => e.preventDefault()}>
@@ -84,7 +84,7 @@ interface BoardEditorViewProps {
 }
 
 const BoardEditorView: FC<BoardEditorViewProps> = () => {
-  const pieces_orig = chessStore(state => state.pieces)
+  const pieces_orig = chessStore(state => state.userPieces)
   const pieces = [
     {
       "name": "Delete", 
@@ -101,7 +101,6 @@ const BoardEditorView: FC<BoardEditorViewProps> = () => {
       "pk": -1
    }, ...pieces_orig
   ]
-  const updatePieces = chessStore(state => state.updatePieces)
   const pkToPiece = chessStore(state => state.pkToPiece)
   pkToPiece.set(-2, pieces[0]);
   pkToPiece.set(-1, pieces[1]);
@@ -118,7 +117,7 @@ const BoardEditorView: FC<BoardEditorViewProps> = () => {
       const data = response.data;
       // Add the pieces to our storage.
       updatePieces(data['pieces'])
-      // Also add tany moves that those pieces may use.
+      // Also add any moves that those pieces may use.
       const moves = data['move_map']
       updatePkToMove(moves);
     })
@@ -137,10 +136,11 @@ const BoardEditorView: FC<BoardEditorViewProps> = () => {
         }
       }
     ).then((response) => {
-      updateBoardSetups(response.data['new_board_setups'])
+      updateBoardSetups([response.data['new_board_setups']])
       setSaveStatus('ok');
-    }).catch(() => {
+    }).catch((e) => {
       setSaveStatus('fail');
+      console.error(e)
     })
   }
   const [saveStatus, setSaveStatus] = useState<SaveState>("ok")

@@ -1,6 +1,6 @@
 import React, { FC, useRef, useState, useEffect } from "react";
 import { Tabs, Modal, Tooltip, Card, Textarea, Button, Label, TextInput } from "flowbite-react"
-import _ from 'lodash'
+import _, { update } from 'lodash'
 import { MoveGrid, Move, Piece } from './types'
 import MoveIcon from './MoveIcon'
 import { ImplementationHelpModal } from "./HelpModal";
@@ -9,20 +9,22 @@ import { SaveElement, SaveState } from "./utils";
 import { api } from "../App"
 import { ImplementationSandbox } from "./ImplementationSandbox";
 import { MoveSelect } from './PieceEditor'
+import { Blockly, pythonGenerator } from '../blockly';
 
 import { chessStore } from "../store";
+import { fetchMoves } from "../networking";
 
 interface MoveEditorProps {
 
 }
 
-const newMoveTemplate = {
+const newMoveTemplate: Move = {
   "cat": "unmade",
   "name": "newMove",
   "overview": "Brief reminder of the ability.",
   "description": "A detailed description of what it does. Perhaps it is somewhat long.",
   "color": [_.random(0, 255), _.random(0, 255), _.random(0, 255)],
-  "implementation": "",
+  "implementation": null,
   "symbol": "+",
   "pk": -2,
 }
@@ -32,14 +34,9 @@ interface MoveSelectModalProps {
 }
 const MoveSelectModal: FC<MoveSelectModalProps> = ({setSelectedMove}) => {
   const [isShown, setShown] = useState<boolean>(false);
-  const moves = chessStore(state => state.moves)
-  const updateMoves = chessStore(state => state.updateMoves)
+  const moves = chessStore(state => state.userMoves)
   useEffect(() => {
-    api.get('/moves', {
-      params: {}
-    }).then((response) => {
-      updateMoves(response.data)
-    })
+    fetchMoves()
   }, [isShown])
   return <div>
   <Button onClick={() => setShown(true)} className="h-5 w-20">
@@ -76,7 +73,11 @@ export const MoveEditor: FC<MoveEditorProps> = ({ }) => {
   const updateMoves = chessStore((store) => store.updateMoves)
 
   const saveMove = () => {
-
+    if(move['implementation'] == null) {
+      setSaveStatus('fail')
+      console.error("No move implementation given")
+      return
+    }
     setSaveStatus('saving')
     api.post("/moves", {}, {
       params: {
@@ -93,7 +94,7 @@ export const MoveEditor: FC<MoveEditorProps> = ({ }) => {
    * input: a function.
    * output: a function that takes a value and applies the given function to the currently selected move.
    */
-  function immutableUpdateMove(update: (value: string, m: Move) => void): (value: string) => void {
+  function immutableUpdateMove(update: (value: any, m: Move) => void): (value: any) => void {
     return (v) => {
       const move_copy = _.clone(move)
       update(v, move_copy)
@@ -103,8 +104,8 @@ export const MoveEditor: FC<MoveEditorProps> = ({ }) => {
   function immutableUpdateMoveFromHandler(update: (value: string, m: Move) => void): React.ChangeEventHandler {
     const upd = immutableUpdateMove(update);
     return (e) => {
-      // @ignore
-      upd(e.target.value);
+      // @ts-ignore
+      upd(e.target.value); 
     }
   }
   
@@ -122,7 +123,6 @@ export const MoveEditor: FC<MoveEditorProps> = ({ }) => {
 
   return <div>
     <Card>
-    <div id="blocklyDiv2" className="w-20 h-30"></div>
     <div className="grid grid-cols-12">
       <div className='col-span-1'>
         <MoveIcon move={move} />
@@ -158,7 +158,16 @@ export const MoveEditor: FC<MoveEditorProps> = ({ }) => {
       </label>
       <ImplementationHelpModal />
     </div>
-    <ImplementationSandbox setImplementation={updateMoveImplementation}/>
+    <div id="blocklyArea" style={{"height": '30rem'}}>
+      <ImplementationSandbox
+      onCodeChange={(workspace) => {
+        const workspace_json = Blockly.serialization.workspaces.save(workspace);
+        updateMoveImplementation(workspace_json)
+      }}
+      divId="blocklyArea"
+      readOnly={false}
+      initialState={null}/>
+    </div>
     <div className='inline-flex'>
       <Button onClick={saveMove}>Save</Button>
       <SaveElement savingState={saveStatus} />

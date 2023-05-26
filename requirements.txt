@@ -1,5 +1,7 @@
 django
+channels[daphne]
+channels_redis
 djangorestframework
 django-cors-headers
-django
 pillow
+service-identity
