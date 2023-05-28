@@ -19,7 +19,8 @@ export const api = axios.create({
   timeout: 1000,
   headers: {'X-CSRFToken': csrf_token}
 });
-
+// expose the data for debugging
+window.chessStore = chessStore
 const App: FC = () => {
   const setMouseDownState = chessStore((state) => state.setMouseDownState)
   const onMouseDown: React.MouseEventHandler<HTMLDivElement> = (e) => {
@@ -32,7 +33,7 @@ const App: FC = () => {
   //https://reactjs.org/docs/code-splitting.html#reactlazy
   useEffect(() => {
     api.interceptors.response.use((response) => {
-      console.info(response)
+      // console.info(response)
       return response
     },
       (error) => {
@@ -75,8 +76,8 @@ const App: FC = () => {
         <Tabs.Item  active={false} title={<div className='inline-flex'>Lobby<HelpModal
           text="Lobby to create games and join games made by other players."/></div>}><Lobby></Lobby></Tabs.Item>
         {
-          games.map((game) => {
-            return <Tabs.Item  active={false} title={game.board_setup_meta.name}><GameView game_info={game}></GameView></Tabs.Item>
+          games.map((game, idx) => {
+            return <Tabs.Item key={'game_' + idx} active={false} title={game.board_name}><GameView game_info={game}></GameView></Tabs.Item>
           })
         }
         <Tabs.Item title={<div className='inline-flex'>Move Editor<HelpModal text="Create custom moves to add to your pieces!" /></div>}>

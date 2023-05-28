@@ -10,6 +10,8 @@ module.exports = {
       colors: {
         'grid_light': '#D1D1D1',
         'grid_dark': '#F4F4F4',
+        'grid_light_highlight': '#701a75',
+        'grid_dark_highlight': '#8b5cf6',
       },
       gridTemplateRows: {
         '15': 'repeat(15, minmax(0, 1fr))'

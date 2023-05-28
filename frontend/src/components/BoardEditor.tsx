@@ -1,13 +1,12 @@
 import React, { FC, useState, useEffect } from 'react'
-import { PIECES, PK_TO_PIECE } from './definitions';
 import { BoardSetup, Move, Piece } from './types';
-import _, { update } from 'lodash'
+import _ from 'lodash'
 import { api } from "../App"
 import PieceView from './PieceView';
-import { boardSetupToMap, moveMapToGrid } from './utils'
-import { SaveElement, SaveState } from "./utils";
+import { SaveElement, SaveState, initBoardSetup } from "./utils";
 import { Button, TextInput } from "flowbite-react"
 import { chessStore, updatePieces } from '../store';
+import { saveBoardToDB } from '../networking';
 
 interface BoardEditorProps {
   boardSetup: BoardSetup;
@@ -59,7 +58,7 @@ export const BoardEditor: FC<BoardEditorProps> = ({ locToHandler, boardSetup}) =
         if (boardCell != null) {
           let image_url = ''
           const piece: Piece = pkToPiece.get(boardCell.piece_pk)!
-          if (boardCell.is_white) {
+          if (boardCell.team == "white") {
             image_url = piece.image_white
           } else {
             image_url = piece.image_black
@@ -74,11 +73,6 @@ export const BoardEditor: FC<BoardEditorProps> = ({ locToHandler, boardSetup}) =
     }
   </div>
 }
-const initBoardSetup: BoardSetup = Array.from({ length: 8 }).map(() => {
-  return Array.from({ length: 8 }).map(() => {
-    return null
-  });
-});
 
 interface BoardEditorViewProps {
 }
@@ -106,10 +100,9 @@ const BoardEditorView: FC<BoardEditorViewProps> = () => {
   pkToPiece.set(-1, pieces[1]);
   const updatePkToMove = chessStore((state) => state.updatePkToMove)
   const [selectedPiece, setSelectedPiece] = useState<Piece | null>(null)
-  const [boardSetup, setBoardSetup] = useState<BoardSetup>(initBoardSetup);
+  const [boardSetup, setBoardSetup] = useState<BoardSetup>(initBoardSetup());
   const [placingWhite, setPlacingWhite] = useState<boolean>(true);
   const [boardName, setBoardName] = useState<string>("");
-  const updateBoardSetups = chessStore((state) => state.updateBoardSetups)
   useEffect(() => {
     api.get('/pieces', {
       params: {}
@@ -127,16 +120,7 @@ const BoardEditorView: FC<BoardEditorViewProps> = () => {
   }
   const saveBoard: React.MouseEventHandler<HTMLButtonElement> = (e) => {
     setSaveStatus("saving");
-    const pieces = boardSetupToMap(boardSetup)
-    api.post('/boardSetups',
-      {
-        params: {
-          name: boardName,
-          piece_locations: pieces,
-        }
-      }
-    ).then((response) => {
-      updateBoardSetups([response.data['new_board_setups']])
+    saveBoardToDB(boardSetup, boardName).then((response) => {
       setSaveStatus('ok');
     }).catch((e) => {
       setSaveStatus('fail');
@@ -161,7 +145,7 @@ const BoardEditorView: FC<BoardEditorViewProps> = () => {
       } else {
         newGrid[row][col] = {
           'piece_pk': selectedPiece.pk,
-          'is_white': placingWhite
+          'team': placingWhite ? 'white' : 'black',
         }
       }
       setBoardSetup(newGrid);
@@ -171,7 +155,7 @@ const BoardEditorView: FC<BoardEditorViewProps> = () => {
   return <div className="grid md:grid-cols-2">
     <div className="col-span-1">
       <PiecesView setSelectedPiece={setSelectedPiece} selectedPiece={selectedPiece} pieces={pieces} swapColors={swapColors} placingWhite={placingWhite} />
-      <BoardEditor boardSetup={boardSetup} pkToPiece={pkToPiece} locToHandler={locToHandler}/>
+      <BoardEditor boardSetup={boardSetup} locToHandler={locToHandler}/>
     <div className='inline-flex'>
         <TextInput
           id="boardName"

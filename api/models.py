@@ -286,13 +286,14 @@ class Game(models.Model):
                     'team': pieceLoc.team,
                     'name': piece['name'],
                     'piece_id': pieceId,
+                    'piece_pk': piece['pk'],
                     'piece_moves': piece['piece_moves']
                 }
             }
             for move in piece['piece_moves']:
                 move_pk = move['move']
                 if move_pk not in moves:
-                    moves[move_pk] = MoveSerializer(Move.objects.get(('pk', move_pk))).data
+                    moves[str(move_pk)] = MoveSerializer(Move.objects.get(('pk', move_pk))).data
 
         game_state_json = {
             'board': board,
@@ -322,9 +323,15 @@ class Game(models.Model):
 
         # Get the move that we want to execute
         piece = board[from_loc]['piece']
+        if piece == None:
+            raise ValidationError("Could not find a piece to move")
+        if (piece['team'] != 'white' and self.white_to_move) or (piece['team'] != 'black' and not self.white_to_move):
+            raise ValidationError(f"It's not currently {piece['team']}'s turn to move!")
+            
         rel_row = to_loc[0] - from_loc[0]
         rel_col = to_loc[1] - from_loc[1]
         move = None
+        print(piece['piece_moves'], rel_row, rel_col)
         for piece_move in piece['piece_moves']:
             if piece_move['relative_row'] == rel_row and piece_move['relative_col'] == rel_col:
                 move = self.game_state['moves'][str(piece_move['move'])]
@@ -356,10 +363,11 @@ class Game(models.Model):
         self.save()
         return True
 
-# class GameSerializer(serializers.ModelSerializer):
-#     white_user = serializers.SlugRelatedField('username', read_only=True)
-#     black_user = serializers.SlugRelatedField('username', read_only=True)
+class GameSerializer(serializers.ModelSerializer):
+    white_user = serializers.SlugRelatedField('username', read_only=True)
+    black_user = serializers.SlugRelatedField('username', read_only=True)
 
-#     class Meta:
-#         model = BoardSetup
-#         fields = ['pk',  'white_to_move' 'white_user', 'black_user', 'game_state']
+    class Meta:
+        model = Game
+        fields = ['pk',  'white_user', 'black_user', 'white_to_move', 'game_state']
+

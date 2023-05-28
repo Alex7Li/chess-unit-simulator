@@ -1,9 +1,10 @@
 // Mm, let's buy things from this store!
 // No, no. It's a database.
-import _, { merge, remove } from 'lodash'
+import _ from 'lodash'
+import { createLobbySocket } from './networking'
 import { create } from 'zustand'
-import { BoardSetupMeta, Move, Piece, Game, LobbySetup } from './components/types'
-import { moveMapToGrid, pieceMapToBoardSetup } from './components/utils'
+import { BoardSetupMeta, Move, Piece, Game, LobbySetup, GameState } from './components/types'
+import { moveMapToGrid } from './components/utils'
 
 const moveOrder = (a: Move) => {
   switch (a.cat) {
@@ -32,13 +33,11 @@ interface ChessStoreInterface {
   // piece map from a primary key, may contain more pieces
   // than just userPieces
   pkToPiece: Map<number, Piece>;
-  // games: Array<Game>;
-  lobby: WebSocket | null;
+  lobby: WebSocket;
   lobbySetups: Array<LobbySetup>;
   games: Array<Game>;
   updatePkToMove: (newPkToMove: {[key: number]: Move}) => void;
   updateMoves: (newMoves: Array<Move>) => void;
-  updateBoardSetups: (newBoards: Array<BoardSetupMeta>) => void;
 
   // Misc
   username: string;
@@ -56,7 +55,7 @@ export const chessStore = create<ChessStoreInterface>()((set) => ({
   boardSetups: [],
   lobbySetups: [],
   // games: [],
-  lobby: null,
+  lobby: createLobbySocket(),
   pkToMove: new Map(),
   pkToPiece: new Map(),
   games: [],
@@ -76,16 +75,6 @@ export const chessStore = create<ChessStoreInterface>()((set) => ({
     }
     return {userMoves: mergedMoves, pkToMove: pkToMove}
   }),
-  updateBoardSetups: (newBoardSetups) => set((state) => {
-    newBoardSetups.map(x => {
-      // @ts-ignore
-      x.board_setup = pieceMapToBoardSetup(x.piece_locations)
-    })
-    const mergedBoards = _.uniqBy([...state.boardSetups, ...newBoardSetups], (board) => board.pk)
-    return {
-      boardSetups: mergedBoards
-    }
-  }),
   // Misc database
   username: '',
   setUsername: (newUsername) => set(() => ({username: newUsername})),
@@ -96,13 +85,6 @@ export const chessStore = create<ChessStoreInterface>()((set) => ({
 }));
 
 
-export const updatePkToPiece = (newPkToPiece: {[key: number]: Piece}) => chessStore.setState((state) => {
-  const ret = new Map(state.pkToPiece);
-  for(let [k, v] of Object.entries(newPkToPiece)) {
-    ret.set(parseInt(k), v);
-  }
-  return {pkToPiece: ret}
-})
 
 export const updatePieces = (newPieces: Array<Piece>) => chessStore.setState((state) => {
     newPieces.map(x => {
@@ -119,4 +101,32 @@ export const updatePieces = (newPieces: Array<Piece>) => chessStore.setState((st
       userPieces: mergedPieces,
       pkToPiece: newPkMap
   }
+})
+
+export const updatePkToPiece = (newPkToPiece: {[key: number]: Piece}) => chessStore.setState((state) => {
+  const ret = new Map(state.pkToPiece);
+  for(let [k, v] of Object.entries(newPkToPiece)) {
+    // @ts-ignore
+    v.moves = moveMapToGrid(v.piece_moves);
+    ret.set(parseInt(k), v);
+  }
+  return {pkToPiece: ret}
+})
+
+export const updateGame = (game_pk: number, newGameState: GameState) => chessStore.setState((state) => {
+  let new_games = _.map(state.games, (game) => {
+    if (game.pk == game_pk) {
+      return {
+        websocket: game.websocket,
+        is_playing_white: game.is_playing_white,
+        is_playing_black: game.is_playing_black,
+        game_state: newGameState,
+        board_name: game.board_name,
+        pk: game.pk
+      }
+    } else {
+      return game
+    }
+  })
+  return {games: new_games}
 })

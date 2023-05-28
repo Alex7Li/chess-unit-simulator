@@ -40,7 +40,6 @@ app.get('/', (req: Request, res: Response) => {
 
 app.post('/', (req: Request, res: Response) => {
   const workspace_json = req.body
-  console.log(req)
   res.send(generate(workspace_json))
 })
 

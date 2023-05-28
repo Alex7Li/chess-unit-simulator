@@ -6,8 +6,10 @@ from asgiref.sync import async_to_sync
 from channels.generic.websocket import WebsocketConsumer
 from django.core.exceptions import ValidationError
 
-from api.models import GameRequest, BoardSetup, GameRequestSerializer, Piece, PieceSerializer, PieceLocation, Game
+from api.models import GameRequest, BoardSetup, GameRequestSerializer, PieceSerializer, PieceLocation, Game, GameSerializer, BoardSetupSerializer
 
+
+# Related file: frontend/src/components/Lobby.tsc
 class LobbyConsumer(WebsocketConsumer):
     def connect(self):
         self.group_name = 'lobby'
@@ -70,8 +72,8 @@ class LobbyConsumer(WebsocketConsumer):
                 )
             except ValidationError as e:
                 self.send(text_data=json.dumps({
-                    "type": "fail",
-                    "message": "Could not send request" + str(e)
+                    "message": "Could not send request" + str(e),
+                    "event_type": "fail"
                     }))
         elif type == 'accept_game':
             pk = data_json['request_pk']
@@ -88,11 +90,10 @@ class LobbyConsumer(WebsocketConsumer):
                 async_to_sync(self.channel_layer.group_send)(
                     self.group_name, {
                         "type": "send_to_socket",
-                        "event_type": "delete_game",
-                        "deleted_ids": [pk], 
-                        "white_player": white.username,
-                        "black_player": black.username,
-                        "game_id": new_game.pk
+                        "event_type": "begin_game",
+                        "deleted_ids": [pk],
+                        "game_data": GameSerializer(new_game).data,
+                        "game_name": accepted_request.board_setup.name
                     }
                 )
             except (ValueError, GameRequest.DoesNotExist):
@@ -127,22 +128,29 @@ class GameConsumer(WebsocketConsumer):
         game = Game.objects.get(('pk', self.game_id))
         from_loc = tuple(text_data_json['from_loc'])
         to_loc = tuple(text_data_json['to_loc'])
-        if (game.make_move(from_loc, to_loc)):
-            # Successful move
-            async_to_sync(self.channel_layer.group_send)(
-                self.group_name,
-                {
-                "type": "send_to_socket",
-                "event_type": "board_update",
-                "game_state": game.game_state,
-                "white_to_move": game.white_to_move}
-            )
-        else:
-            # Move is not valid
+        try:
+            if (game.make_move(from_loc, to_loc)):
+                # Successful move
+                async_to_sync(self.channel_layer.group_send)(
+                    self.group_name,
+                    {
+                    "type": "send_to_socket",
+                    "event_type": "board_update",
+                    "game_data": GameSerializer(game).data,
+                    }
+                )
+            else:
+                # Move is not valid
+                self.send(text_data=json.dumps({
+                    "event_type": "invalid_move",
+                    "message": "You cannot move that piece to that location."
+                    }))
+        except ValidationError as e:
             self.send(text_data=json.dumps({
                 "event_type": "invalid_move",
-                "message": "You cannot move that piece to that location."
+                "message": str(e)
                 }))
+        
 
     # Receive message from room group
     def send_to_socket(self, event):

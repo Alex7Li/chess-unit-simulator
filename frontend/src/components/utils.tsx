@@ -1,10 +1,23 @@
-import React, {FC} from "react";
-import { MoveGrid, MoveMap, BoardSetup, PieceMap } from './types'
+import React, {FC, useState} from "react";
+import _ from 'lodash'
+import { MoveGrid, MoveMap, BoardSetup, PieceMap, GameState, GamePiece } from './types'
+import { useStore } from "zustand";
+import { chessStore } from "../store";
 export type SaveState ='saving'|'fail'|'ok' 
 
 interface SaveElementProps {
   savingState: SaveState
 }
+
+export const initBoardSetup = () => {
+  const grid: BoardSetup = Array.from({ length: 8 }).map((_, row: number) => {
+    return Array.from({ length: 8 }).map((_, col: number) => {
+      return null
+    });
+  });
+  return grid;
+};
+
 export const SaveElement: FC<SaveElementProps> = ({savingState}) => {
   let response = <p>{savingState}</p>
   if(savingState == 'fail'){
@@ -52,37 +65,15 @@ export const moveMapToGrid = (moveMap: MoveMap) => {
   return moveGrid;
 }
 
-
-export const boardSetupToMap = (grid: BoardSetup) => {
-  const moveMap: PieceMap = [];
-  console.assert(grid.length == 8)
-  console.assert(grid[0].length == 8)
-  for (let i = 0; i < 8; i++) {
-    for (let j = 0; j < 8; j++) {
-      const value = grid[i][j];
-      if (value != null) {
-        moveMap.push({
-          'row': i,
-          'col': j,
-          'piece': value.piece_pk,
-          'team': value.is_white ? 'white' : 'black'
-        })
-      }
-    }
-  }
-  return moveMap;
-}
-
 export const pieceMapToBoardSetup = (pieceMap: PieceMap) => {
-  const grid: BoardSetup = Array.from({ length: 8 }).map(() => {
-    return Array.from({ length: 8 }).map(() => {
-      return null
-    });
-  });
+  const grid = initBoardSetup()
   for (let piece of Object.values(pieceMap)) {
+    // backend uses the field name name 'piece' instead of piece_pk
+    // @ts-ignore
+    const piece_pk = piece.piece || piece.piece_pk
     grid[piece.row][piece.col] = {
-      piece_pk: piece.piece,
-      is_white: piece.team == 'white'
+      piece_pk: piece_pk,
+      team: piece.team
     }
   }
   return grid;
