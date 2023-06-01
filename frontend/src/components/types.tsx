@@ -17,19 +17,10 @@ export interface Move {
 
 export type MoveGrid = (number | null)[][];
 
-export type PieceMove = {
-  relative_row: number,
-  relative_col: number,
-  move: number,
-}
-
-// A map from the primary key of the move to all (dx, dy) where it applies
-export type MoveMap = Array<PieceMove>;
-
 export interface Piece {
   name: string; // max length 31
-  image_white: string;
-  image_black: string;
+  imageWhite: string;
+  imageBlack: string;
   moves: MoveGrid;
   author?: string;
   pk: number; // max length 31
@@ -45,34 +36,36 @@ export interface BoardPosition {
 export type PieceOnBoard = {
   row: number;
   col: number;
-  piece_pk: number;
+  piecePk: number;
   team: string;
 }
 
 export type BoardSetupPiece = {
-  piece_pk: number;
+  piecePk: number;
   team: string;
+  isRoyal: boolean;
 }
 
 export type PieceMap = Array<PieceOnBoard>
 export type BoardSetup = (BoardSetupPiece | null)[][]
-export type BoardSetupMeta = {
+export interface BoardSetupMeta {
   author: string,
-  board_setup: BoardSetup,
+  boardSetup: BoardSetup,
   cat: string
   name: string,
   pk: number,
 }
 
 export type LobbySetup = {
-  requesting_user: string,
-  board_setup_meta: BoardSetupMeta,
+  requestingUser: string,
+  boardSetupMeta: BoardSetupMeta,
   pk: number,
 }
 
 // Piece + information pertaining to a specific game being played
 export interface GamePiece extends Piece {
   team: string
+  isRoyal: boolean
 }
 
 // State of a tile pertaining to a specific game being played
@@ -88,9 +81,9 @@ export type Game = {
   websocket: WebSocket,
   // Booleans detecting if you are playing as white or black. Note that
   // both can be true for local multiplayer.
-  is_playing_white: boolean,
-  is_playing_black: boolean,
-  game_state: GameState,
-  board_name: string,
+  isPlayingWhite: boolean,
+  isPlayingBlack: boolean,
+  gameState: GameState,
+  boardName: string,
   pk: number
 }

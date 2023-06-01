@@ -36,8 +36,8 @@ class Users(APIView):
             username = request.query_params.get('username')
             password = request.query_params.get('password')
             email = request.query_params.get('email')
-            user = User.objects.create_user(username=username, email=email, password=password)
             try:
+                user = User.objects.create_user(username=username, email=email, password=password)
                 if email == '':
                     raise ValidationError("No email given")
                 user.full_clean()
@@ -66,8 +66,6 @@ class Users(APIView):
                 # should never happen
                 return ResponseWithMessage("Invalid credentials", status=status.HTTP_401_UNAUTHORIZED)
         elif type == "logout":
-            print("logout USER")
-            print(request.user)
             logout(request)
             return Response(status=status.HTTP_200_OK)
         return ResponseWithMessage("Invalid post request type", status=status.HTTP_400_BAD_REQUEST)
@@ -180,7 +178,8 @@ class BoardSetups(APIView):
             return ResponseWithMessage("You must be logged in to save", status=status.HTTP_401_UNAUTHORIZED)
         try:
             boardSetup = BoardSetup.create_board(author=request.user, name=board['name'],
-                                            pieces=board['piece_locations'], cat=BoardSetup.Category.CUSTOM)
+                                            pieces=board['piece_locations'], cat=BoardSetup.Category.CUSTOM,
+                                            wincon_white=board['wincon_white'], wincon_black=board['wincon_black'])
             return Response({'new_board_setups': BoardSetupSerializer(boardSetup).data},
                             status=status.HTTP_201_CREATED)
         except ValidationError as e:

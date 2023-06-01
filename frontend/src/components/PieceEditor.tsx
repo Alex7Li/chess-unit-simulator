@@ -11,7 +11,6 @@ import { api } from "../App"
 import { moveGridToMap } from './utils'
 import { chessStore, updatePieces } from "../store";
 import {pythonGenerator} from '../blockly';
-import { fetchMoves } from "../networking";
 import { ImplementationSandbox } from "./ImplementationSandbox";
 
 const initMoveGrid: MoveGrid = Array.from({ length: 15 }).map(() => {
@@ -67,9 +66,6 @@ const PieceEditor: FC<PieceEditorProps> = () => {
   }, ...moves_orig]
   const [selectedMove, selectMove] = useState<Move>(moves[0]);
   const [saveStatus, setSaveStatus] = useState<SaveState>("ok")
-  useEffect(() => {
-    fetchMoves()
-  }, [saveStatus])
   const pk_to_move: { [key: number]: Move } = {} //Lookup key by move name
   _.forEach(moves, function (m: Move) {
     pk_to_move[m.pk] = m;

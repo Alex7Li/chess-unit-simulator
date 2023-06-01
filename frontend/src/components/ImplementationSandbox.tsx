@@ -31,7 +31,7 @@ const toolbox = {
         },
         {
           "kind": "block",
-          "type": "move",
+          "type": "teleport",
           "inputs": {
             "FROM_UNIT": {
               "block": {
@@ -42,11 +42,7 @@ const toolbox = {
         },
         {
           "kind": "block",
-          "type": "attack"
-        },
-        {
-          "kind": "block",
-          "type": "move_or_attack"
+          "type": "take"
         },
         {
           "kind": "block",
@@ -59,7 +55,17 @@ const toolbox = {
         {
           "kind": "block",
           "type": "targeted_tile"
-        },
+        }
+      ]
+    },
+    {
+      "kind": "category",
+      "name": "Lists",
+      "contents": [
+        {
+          "kind": "block",
+          "type": "path"
+        }
       ]
     },
     {

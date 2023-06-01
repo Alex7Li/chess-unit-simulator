@@ -1,7 +1,7 @@
 // Mm, let's buy things from this store!
 // No, no. It's a database.
 import _ from 'lodash'
-import { createLobbySocket } from './networking'
+import { DjangoPiece,  createLobbySocket} from './networking'
 import { create } from 'zustand'
 import { BoardSetupMeta, Move, Piece, Game, LobbySetup, GameState } from './components/types'
 import { moveMapToGrid } from './components/utils'
@@ -15,7 +15,6 @@ const moveOrder = (a: Move) => {
     default: console.error("Got bad move category: " + a.cat); return 3;
   }
 }
-
 
 interface ChessStoreInterface {
   // Chess Related
@@ -33,21 +32,16 @@ interface ChessStoreInterface {
   // piece map from a primary key, may contain more pieces
   // than just userPieces
   pkToPiece: Map<number, Piece>;
-  lobby: WebSocket;
+  lobby: null | WebSocket;
   lobbySetups: Array<LobbySetup>;
   games: Array<Game>;
-  updatePkToMove: (newPkToMove: {[key: number]: Move}) => void;
   updateMoves: (newMoves: Array<Move>) => void;
 
   // Misc
   username: string;
-  setUsername: (username: string) => void;
   mouseDownState: number;
-  setMouseDownState: (newState: number) => void;
   errorMessage: string;
-  setErrorMessage: (newMessage: string) => void;
 }
-
 export const chessStore = create<ChessStoreInterface>()((set) => ({
   // Chess Related
   userMoves: [],
@@ -55,17 +49,10 @@ export const chessStore = create<ChessStoreInterface>()((set) => ({
   boardSetups: [],
   lobbySetups: [],
   // games: [],
-  lobby: createLobbySocket(),
+  lobby: null, 
   pkToMove: new Map(),
   pkToPiece: new Map(),
   games: [],
-  updatePkToMove: (newPkToMove) => set((state) => {
-    const ret = new Map<number, Move>(state.pkToMove);
-    for(let [k, v] of Object.entries(newPkToMove)) {
-      ret.set(parseInt(k), v);
-    }
-    return {pkToMove: ret}
-  }),
   updateMoves: (newMoves) => set((state) => {
     let mergedMoves = _.unionBy([...state.userMoves, ...newMoves], (move) => move.pk);
     mergedMoves.sort((a, b) => moveOrder(a) - moveOrder(b));
@@ -77,20 +64,33 @@ export const chessStore = create<ChessStoreInterface>()((set) => ({
   }),
   // Misc database
   username: '',
-  setUsername: (newUsername) => set(() => ({username: newUsername})),
   mouseDownState: 0,
-  setMouseDownState: (newState) => set(()  => ({mouseDownState: newState})),
   errorMessage: "",
-  setErrorMessage: (newMessage) => set(()  => ({errorMessage: newMessage})),
 }));
 
 
+export const setErrorMessage = (message: string) => chessStore.setState((state) => {
+  return {
+    errorMessage: message
+  }
+});
 
-export const updatePieces = (newPieces: Array<Piece>) => chessStore.setState((state) => {
-    newPieces.map(x => {
-      // @ts-ignore
-      x.moves = moveMapToGrid(x.piece_moves);
-      return x
+export const setMouseDownState = (state: number) => chessStore.setState((state) => {
+  return {
+    mouseDownState: state
+  }
+});
+
+export const updatePieces = (pieceData: Array<DjangoPiece>) => chessStore.setState((state) => {
+    const newPieces: Array<Piece> = _.map(pieceData, x => {
+      return {
+        moves:  moveMapToGrid(x.piece_moves),
+        name: x.name,
+        imageBlack: x.image_black,
+        imageWhite: x.image_white,
+        pk: x.pk,
+        author: x.author
+      }
     });
     const mergedPieces = _.uniqBy([...state.userPieces, ...newPieces], (piece) => piece.pk)
     const newPkMap= new Map<number, Piece>(state.pkToPiece); //Lookup key by move name
@@ -102,13 +102,26 @@ export const updatePieces = (newPieces: Array<Piece>) => chessStore.setState((st
       pkToPiece: newPkMap
   }
 })
+export const updatePkToMove = (newPkToMove: {[key: number]: Move}) => chessStore.setState((state) => {
+    const ret = new Map<number, Move>(state.pkToMove);
+    for(let [k, v] of Object.entries(newPkToMove)) {
+      ret.set(parseInt(k), v);
+    }
+    return {pkToMove: ret}
+})
 
-export const updatePkToPiece = (newPkToPiece: {[key: number]: Piece}) => chessStore.setState((state) => {
+export const updatePkToPiece = (newPkToPiece: {[key: number]: DjangoPiece}) => chessStore.setState((state) => {
   const ret = new Map(state.pkToPiece);
   for(let [k, v] of Object.entries(newPkToPiece)) {
-    // @ts-ignore
-    v.moves = moveMapToGrid(v.piece_moves);
-    ret.set(parseInt(k), v);
+    const piece: Piece = {
+        moves:  moveMapToGrid(v.piece_moves),
+        name: v.name,
+        imageBlack: v.image_black,
+        imageWhite: v.image_white,
+        pk: v.pk,
+        author: v.author
+    }
+    ret.set(parseInt(k), piece);
   }
   return {pkToPiece: ret}
 })
@@ -118,10 +131,10 @@ export const updateGame = (game_pk: number, newGameState: GameState) => chessSto
     if (game.pk == game_pk) {
       return {
         websocket: game.websocket,
-        is_playing_white: game.is_playing_white,
-        is_playing_black: game.is_playing_black,
-        game_state: newGameState,
-        board_name: game.board_name,
+        isPlayingWhite: game.isPlayingWhite,
+        isPlayingBlack: game.isPlayingBlack,
+        gameState: newGameState,
+        boardName: game.boardName,
         pk: game.pk
       }
     } else {

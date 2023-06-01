@@ -15,7 +15,7 @@ from django.core.files import File
 from django.db.utils import IntegrityError
 from rest_framework import serializers
 
-import api.move
+import api.game_logic
 
 def to_color_string(color_array):
     return '[' + ','.join(map(str, color_array)) + ']'
@@ -177,20 +177,39 @@ class BoardSetup(models.Model):
         CUSTOM = 'custom'
         GAME_IN_PROGRESS = 'game'
     cat = models.CharField(max_length=10, choices=Category.choices)
+    class WinCon(models.TextChoices):
+        KILL_ANY_ROYAL = 'anyR'
+        KILL_ALL_ROYALS = 'allR'
+        KILL_ALL = 'all'
+    wincon_white = models.CharField(max_length=4, choices=WinCon.choices, default=WinCon.KILL_ALL)
+    wincon_black = models.CharField(max_length=4, choices=WinCon.choices, default=WinCon.KILL_ALL)
 
     def __str__(self):
         return f"Board Setup: {self.name} by {self.author}"
     
     @staticmethod
-    def create_board(author: User, name: str, pieces: List[Dict[str, int]], cat: Category):
+    def create_board(author: User, name: str, pieces: List[Dict[str, int]],
+                     cat: Category, wincon_white: WinCon, wincon_black: WinCon):
         pieceLocations = []
-        board = BoardSetup(author=author, name=name, cat=cat)
+        board = BoardSetup(author=author, name=name, cat=cat,
+                           wincon_black=wincon_black,
+                           wincon_white=wincon_white)
+        white_has_piece = False
+        black_has_piece = False
+        white_has_royal = False
+        black_has_royal = False
         for pieceLocation in pieces:
             piece = Piece.objects.get(pk=pieceLocation['piece'])
             if pieceLocation['team'] == 'white':
                 team = PieceLocation.Team.WHITE
+                white_has_piece = True
+                if pieceLocation['is_royal']:
+                    white_has_royal = True
             elif pieceLocation['team'] == 'black':
                 team = PieceLocation.Team.BLACK
+                black_has_piece = True
+                if pieceLocation['is_royal']:
+                    black_has_royal = True
             else:
                 raise ValidationError(f"Invalid team, expected 'white' or 'black' but got {pieceLocation['team']}")
             pieceLocations.append(PieceLocation(
@@ -198,8 +217,17 @@ class BoardSetup(models.Model):
                 col=pieceLocation['col'],
                 board_setup=board,
                 piece=piece,
-                team=team
+                team=team,
+                is_royal=pieceLocation['is_royal']
             ))
+        if not black_has_piece or not white_has_piece:
+            raise ValidationError("Invalid team, both black and white need to have at least 1 piece!")
+        if wincon_white == BoardSetup.WinCon.KILL_ANY_ROYAL or wincon_white == BoardSetup.WinCon.KILL_ALL_ROYALS:
+            if not black_has_royal:
+                raise ValidationError("Black has no royal pieces")
+        if wincon_black == BoardSetup.WinCon.KILL_ANY_ROYAL or wincon_black == BoardSetup.WinCon.KILL_ALL_ROYALS:
+            if not white_has_royal:
+                raise ValidationError("White has no royal pieces")
         try:
             board.save()
             for pieceLoc in pieceLocations:
@@ -226,9 +254,12 @@ class PieceLocation(models.Model):
         MaxValueValidator(7)
     ])
     piece = models.ForeignKey(Piece, on_delete=models.RESTRICT)
+    is_royal = models.BooleanField(default=False)
+
     class Team(models.TextChoices):
         WHITE = 'white'
         BLACK = 'black'
+
     team = models.CharField(max_length=5, choices=Team.choices)
     board_setup = models.ForeignKey(BoardSetup, on_delete=models.CASCADE, related_name='piece_locations')
 
@@ -240,7 +271,7 @@ class PieceLocation(models.Model):
 class PieceLocationSerializer(serializers.ModelSerializer):
     class Meta:
         model = PieceLocation
-        fields = ['row', 'col', 'piece', 'team']
+        fields = ['row', 'col', 'piece', 'team', 'is_royal']
 
 class BoardSetupSerializer(serializers.ModelSerializer):
     piece_locations = PieceLocationSerializer(many=True, read_only=True)
@@ -261,11 +292,22 @@ class GameRequestSerializer(serializers.ModelSerializer):
         model = GameRequest
         fields = ['pk', 'board_setup', 'requesting_user']
 
+#############################################
+######### Game helper functions #############
+#############################################
+
 class Game(models.Model):
     white_user = models.ForeignKey(User, on_delete=models.CASCADE, related_name='white_user')
     black_user = models.ForeignKey(User, on_delete=models.CASCADE, related_name='black_user')
     white_to_move = models.BooleanField(default=True)
     game_state = models.JSONField()
+
+    class Result(models.TextChoices):
+        WHITE_WIN = 'W'
+        BLACK_WIN = 'B'
+        DRAW = 'D'
+        IN_PROGRESS = "P"
+    result = models.CharField(max_length=1, choices=Result.choices, default='P')
 
     @staticmethod
     def create_game(white_user: User, black_user: User, orig_board_setup: BoardSetup):
@@ -287,7 +329,8 @@ class Game(models.Model):
                     'name': piece['name'],
                     'piece_id': pieceId,
                     'piece_pk': piece['pk'],
-                    'piece_moves': piece['piece_moves']
+                    'piece_moves': piece['piece_moves'],
+                    'is_royal': pieceLoc.is_royal
                 }
             }
             for move in piece['piece_moves']:
@@ -297,7 +340,10 @@ class Game(models.Model):
 
         game_state_json = {
             'board': board,
-            'moves': moves
+            'moves': moves,
+            'wincon_white': orig_board_setup.wincon_white,
+            'wincon_black': orig_board_setup.wincon_black,
+            'result': Game.Result.IN_PROGRESS
         }
 
         game = Game(white_user=white_user, black_user=black_user, game_state=game_state_json)
@@ -309,14 +355,14 @@ class Game(models.Model):
         board = {}
         for row in range(8):
             for col in range(8):
-                board[(row, col)] = {'piece': None}
-
+                board[api.game_logic.Location(row, col)] = {'piece': None}
         # Convert keys from string to tuple and flip board for black
         for k, v in self.game_state['board'].items():
             row, col = k.split(',')
             if not self.white_to_move:
                 row = 7 - int(row)
-            board[(int(row), int(col))] = v
+            board[api.game_logic.Location(int(row), int(col))] = v
+
         if not self.white_to_move:
             from_loc = 7 - from_loc[0], from_loc[1]
             to_loc = 7 - to_loc[0], to_loc[1]
@@ -331,7 +377,6 @@ class Game(models.Model):
         rel_row = to_loc[0] - from_loc[0]
         rel_col = to_loc[1] - from_loc[1]
         move = None
-        print(piece['piece_moves'], rel_row, rel_col)
         for piece_move in piece['piece_moves']:
             if piece_move['relative_row'] == rel_row and piece_move['relative_col'] == rel_col:
                 move = self.game_state['moves'][str(piece_move['move'])]
@@ -346,9 +391,18 @@ class Game(models.Model):
         if response.status_code != 200:
             raise ValidationError(f"Code conversion server has failed with error code {response.status_code}")
 
+        start_pieces = count_surviving_pieces(board)
+
         # Make the move!
-        if not api.move.make_move(response.text, board, from_loc, to_loc):
-            return False # This move is not a valid one
+        try:
+            if not api.game_logic.make_move(
+                response.text, board, api.game_logic.Location(*from_loc), api.game_logic.Location(*to_loc)):
+                return False # This move is not a valid one
+        except AttributeError:
+            raise ValidationError("This move could not be executed. Try another move instead.")
+        end_pieces = count_surviving_pieces(board)
+        self.game_state['result'] = get_game_result(
+            start_pieces, end_pieces, self.game_state['wincon_white'], self.game_state['wincon_black'])
 
         # Convert keys from tuple back to a json-able string and flip board back for black
         new_board = {}
@@ -360,8 +414,49 @@ class Game(models.Model):
 
         self.game_state['board'] = new_board
         self.white_to_move = not self.white_to_move
+
         self.save()
         return True
+
+def count_surviving_pieces(board: Dict[api.game_logic.Location, api.game_logic.BoardTile]):
+    counts = {
+        'white_total': 0,
+        'black_total': 0,
+        'white_royal': 0,
+        'black_royal': 0
+    }
+    for tile in board.values():
+        piece = tile['piece']
+        if piece != None:
+            if piece['team'] == 'white':
+                counts['white_total'] += 1
+                if piece['is_royal']:
+                    counts['white_royal'] += 1
+            if piece['team'] == 'black':
+                counts['black_total'] += 1
+                if piece['is_royal']:
+                    counts['black_royal'] += 1
+    return counts
+
+def get_game_result(start_pieces, end_pieces, wincon_white: BoardSetup.WinCon, wincon_black: BoardSetup.WinCon):
+    results = []
+    for team, other_team, wincon in zip(['white', 'black'], ['black', 'white'], [wincon_white, wincon_black]):
+        team_won = False
+        if wincon == BoardSetup.WinCon.KILL_ALL and end_pieces[f"{other_team}_total"] == 0:
+            team_won = True
+        elif wincon == BoardSetup.WinCon.KILL_ALL_ROYALS and end_pieces[f"{other_team}_royal"] == 0:
+            team_won = True
+        elif wincon == BoardSetup.WinCon.KILL_ANY_ROYAL and end_pieces[f"{other_team}_royal"] < start_pieces[f"{other_team}_royal"]:
+            team_won = True
+        results.append(team_won)
+    if not results[0] and not results[1]:
+        return Game.Result.IN_PROGRESS
+    elif results[0] and not results[1]:
+        return Game.Result.WHITE_WIN
+    elif not results[0] and results[1]:
+        return Game.Result.BLACK_WIN
+    elif not results[0] and results[1]:
+        return Game.Result.DRAW
 
 class GameSerializer(serializers.ModelSerializer):
     white_user = serializers.SlugRelatedField('username', read_only=True)

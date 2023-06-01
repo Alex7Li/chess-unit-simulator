@@ -1,8 +1,7 @@
 import React, {FC, useState} from "react";
 import _ from 'lodash'
-import { MoveGrid, MoveMap, BoardSetup, PieceMap, GameState, GamePiece } from './types'
-import { useStore } from "zustand";
-import { chessStore } from "../store";
+import { MoveGrid, BoardSetup } from './types'
+import { DjangoMoveMap } from "../networking";
 export type SaveState ='saving'|'fail'|'ok' 
 
 interface SaveElementProps {
@@ -35,7 +34,7 @@ export const SaveElement: FC<SaveElementProps> = ({savingState}) => {
 }
 
 export const moveGridToMap = (grid: MoveGrid) => {
-  const moveMap: MoveMap = [];
+  const moveMap: DjangoMoveMap = [];
   console.assert(grid.length == 15)
   console.assert(grid[0].length == 15)
   for (let i = 0; i < 15; i++) {
@@ -53,7 +52,7 @@ export const moveGridToMap = (grid: MoveGrid) => {
   return moveMap;
 }
 
-export const moveMapToGrid = (moveMap: MoveMap) => {
+export const moveMapToGrid = (moveMap: DjangoMoveMap) => {
   const moveGrid: MoveGrid = Array.from({ length: 15 }).map(() => {
     return Array.from({ length: 15 }).map(() => {
       return null
@@ -63,18 +62,4 @@ export const moveMapToGrid = (moveMap: MoveMap) => {
     moveGrid[pieceMove.relative_row + 7][pieceMove.relative_col + 7] = pieceMove.move
   }
   return moveGrid;
-}
-
-export const pieceMapToBoardSetup = (pieceMap: PieceMap) => {
-  const grid = initBoardSetup()
-  for (let piece of Object.values(pieceMap)) {
-    // backend uses the field name name 'piece' instead of piece_pk
-    // @ts-ignore
-    const piece_pk = piece.piece || piece.piece_pk
-    grid[piece.row][piece.col] = {
-      piece_pk: piece_pk,
-      team: piece.team
-    }
-  }
-  return grid;
 }

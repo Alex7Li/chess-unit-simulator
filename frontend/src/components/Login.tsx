@@ -2,10 +2,13 @@ import React, { useState, useEffect } from 'react'
 import { api } from '../App'
 import { Label, TextInput, Button } from 'flowbite-react';
 import { chessStore } from '../store';
+import { onLogin as fetchDataOnLogin, onLogin } from '../networking';
 
 export default function Login() {
+  const setUsername =  (username: string) => chessStore.setState(()=>{
+    return {'username': username}
+  })
   const username = chessStore((state) => state.username)
-  const setUsername = chessStore((state) => state.setUsername)
   const [formUsername, setFormUsername] = useState('')
   const [password, setPassword] = useState('')
   const [email, setEmail] = useState('')
@@ -13,11 +16,9 @@ export default function Login() {
 
   useEffect(() => {
     api.get('/users', {
-      params: {
-        type: 'check_current_user',
-      }
+      params: {}
     }).then((response) => {
-      setUsername(response.data.username)
+      onLogin(response.data.username)
     })
   }, [])
 
@@ -33,6 +34,7 @@ export default function Login() {
           type: 'signup'
         }
       }).then(() => {
+        console.log("SIGNUP COMPLETE")
         setUsername(formUsername)
         // TODO: here, login, logout
         // refresh so that django login is registered
@@ -49,6 +51,7 @@ export default function Login() {
         type: 'login'
       }
     }).then(() => {
+      console.log("LOGIN COMPLETE")
       setUsername(formUsername)
       window.location.reload();
     })

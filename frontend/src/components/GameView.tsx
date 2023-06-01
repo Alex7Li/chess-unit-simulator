@@ -1,11 +1,10 @@
 import React, { FC, useRef, useState, useEffect } from "react";
 import _ from 'lodash'
-import { api } from "../App"
 import { chessStore, updateGame } from "../store";
 import { Game, GameState, GameTile, GamePiece } from "./types";
 import PieceView from "./PieceView";
 import MoveIcon from "./MoveIcon";
-import { GameStateFromDjango } from "../networking";
+import { gameStateFromDjango } from "../networking";
 
 // Related file: api/consumers
 export const makeGameSocket = (gamePk: number) => {
@@ -16,12 +15,12 @@ export const makeGameSocket = (gamePk: number) => {
   
   gameSocket.onmessage = function (m) {
     const data = JSON.parse(m.data);
-    if(data['event_type'] == 'invalid_move') {
+    if ((data['event_type'] == 'invalid_move') || (data['event_type'] == 'fail')){
       chessStore.setState(() => {
         return {errorMessage: data['message']}
       })
     } else if (data['event_type'] == "board_update") {
-      const newState = GameStateFromDjango(data['game_data']['game_state'])
+      const newState = gameStateFromDjango(data['game_data']['game_state'])
       updateGame(gamePk, newState)
     }
   }
@@ -43,7 +42,6 @@ interface PlayBoardViewProps {
 }
 
 const PlayBoardView: FC<PlayBoardViewProps> = ({ locToHandler, gameState, selectedTile }) => {
-  const pkToPiece = chessStore((state) => state.pkToPiece)
   const pkToMove = chessStore((state) => state.pkToMove)
   return <div className="grid grid-cols-8 grid-rows-8 gap-x-0 h-98 w-98 border-gray-900 border-2 p-0 m-0">
     {gameState.map((boardLine, row) => {
@@ -64,35 +62,39 @@ const PlayBoardView: FC<PlayBoardViewProps> = ({ locToHandler, gameState, select
             grid_style += " bg-grid_dark"
           }
         }
-        let inner_element = <></>
+        // first div is relative, others are absolute
+        let inner_piece = <div className='relative h-12'/>
+        let inner_icon = <></>
+        let inner_royal = <></>
         let image_url = null
         if (boardCell.piece != null) {
           if (boardCell.piece.team == "white") {
-            image_url = boardCell.piece.image_white
+            image_url = boardCell.piece.imageWhite
           } else {
-            image_url = boardCell.piece.image_black
+            image_url = boardCell.piece.imageBlack
           }
-          inner_element = <img draggable="false" src={image_url} />
+          inner_piece = <img draggable="false" src={image_url} className="relative z-10"/>
+          if (boardCell.piece.isRoyal) {
+            inner_royal = <img draggable="false" src="media/crown.png" className="absolute z-20 top-0 left-0 h-4 w-4 rotate-12 mx-8 -my-1 rounded-md drop-shadow-md"/>
+          }
         }
-        if(selectedTile?.piece) {
+        if (selectedTile?.piece) {
           let d_row = row - selectedTile.row
-          if(selectedTile.piece.team == 'black') {
+          if (selectedTile.piece.team == 'black') {
             d_row *= -1
           }
           d_row += 7
           const movePk = selectedTile.piece.moves[d_row][col - selectedTile.col + 7]
           if (movePk != null) {
             const move = pkToMove.get(movePk)!
-            if (image_url != null) {
-              inner_element = <div className='relative'>
-                <img draggable="false" src={image_url} className="top-0 left-0"/>
-                <MoveIcon move={move} className="absolute top-0 left-0 h-6 w-6 my-3 mx-3 rounded-md border-2 drop-shadow-md"/>
-              </div>
-            } else {
-              inner_element = <MoveIcon move={move} transparency={.5} className="h-6 w-6 my-3 mx-3 rounded-md border-2 drop-shadow-md"></MoveIcon>
-            }
+            inner_icon = <MoveIcon move={move} transparency={.5} className="absolute z-30 h-6 w-6 my-3 mx-3 rounded-md border-2 drop-shadow-md top-0 left-0"></MoveIcon>
           }
         }
+        const inner_element = <div className='relative'>
+          {inner_piece}
+          {inner_icon}
+          {inner_royal}
+        </div>
         return <button className={grid_style} key={row * 15 + col} onMouseDown={locToHandler(row, col)}>
           {inner_element}
         </button>
@@ -111,7 +113,7 @@ export const GameView: FC<GameProps> = ({game_info}) => {
   const [selTile, setSelectedTile] = useState<GameTile | null>(null)
   const locToHandler = (row: number, col: number) => {
       const handlerFunc: React.MouseEventHandler<HTMLButtonElement> = (e) => {
-      let selectedPiece: null | GamePiece = game_info.game_state[row][col].piece
+      let selectedPiece: null | GamePiece = game_info.gameState[row][col].piece
       if (selTile == null) {
         // Left click to select a location when no location is selected
         if (e.button == 0) {
@@ -167,11 +169,11 @@ export const GameView: FC<GameProps> = ({game_info}) => {
     return handlerFunc
   }
   return <div>
-    <p>{game_info.is_playing_white ? "White: you" : "White: someone else"} </p>
-    <p>{game_info.is_playing_black ? "Black: you" : "Black: someone else"} </p>
+    <p>{game_info.isPlayingWhite ? "White: you" : "White: someone else"} </p>
+    <p>{game_info.isPlayingBlack ? "Black: you" : "Black: someone else"} </p>
     <div className="grid md:grid-cols-2">
       <div className="col-span-1">
-        <PlayBoardView locToHandler={locToHandler} gameState={game_info.game_state} selectedTile={selTile}/>
+        <PlayBoardView locToHandler={locToHandler} gameState={game_info.gameState} selectedTile={selTile}/>
       </div>
       <div className="col-span-1">
         {selTile?.piece == null ? <></> : 

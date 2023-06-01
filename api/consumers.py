@@ -16,10 +16,18 @@ class LobbyConsumer(WebsocketConsumer):
         async_to_sync(self.channel_layer.group_add)(
             self.group_name, self.channel_name
         )
+        if str(self.scope['user']) == "AnonymousUser":
+            return
         self.accept()
 
     def disconnect(self, close_code):
         current_user = self.scope["user"]
+        if str(current_user) == "AnonymousUser":
+            self.send(text_data=json.dumps({
+                "message": "Not logged in, could not send request.",
+                "event_type": "fail"
+            }))
+            return
 
         # Remove all pending requests
         open_requests = GameRequest.objects.filter(requesting_user=current_user)
@@ -47,6 +55,12 @@ class LobbyConsumer(WebsocketConsumer):
         data_json = json.loads(text_data)
         type = data_json['event_type']
         requesting_user = self.scope["user"]
+        if str(requesting_user) == "AnonymousUser":
+            self.send(text_data=json.dumps({
+                "message": "Not logged in, could not send request.",
+                "event_type": "fail"
+            }))
+            return
         if type == 'request_game':
             board_pk = data_json["board_pk"]
             board_setup = BoardSetup.objects.get(('pk', board_pk))
@@ -113,6 +127,9 @@ class GameConsumer(WebsocketConsumer):
     def connect(self):
         self.game_id = self.scope["url_route"]["kwargs"]["game_id"]
         self.group_name = f'game_{self.game_id}'
+        requesting_user = self.scope["user"]
+        if str(requesting_user) == "AnonymousUser":
+            return
         async_to_sync(self.channel_layer.group_add)(
             self.group_name, self.channel_name
         )
@@ -125,6 +142,12 @@ class GameConsumer(WebsocketConsumer):
     def receive(self, text_data):
         text_data_json = json.loads(text_data)
         requesting_user = self.scope["user"]
+        if str(requesting_user) == "AnonymousUser":
+            self.send(text_data=json.dumps({
+                "message": "Not logged in, could not send request.",
+                "event_type": "fail"
+                }))
+            return
         game = Game.objects.get(('pk', self.game_id))
         from_loc = tuple(text_data_json['from_loc'])
         to_loc = tuple(text_data_json['to_loc'])

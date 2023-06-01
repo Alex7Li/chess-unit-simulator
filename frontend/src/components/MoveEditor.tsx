@@ -12,7 +12,6 @@ import { MoveSelect } from './PieceEditor'
 import { Blockly, pythonGenerator } from '../blockly';
 
 import { chessStore } from "../store";
-import { fetchMoves } from "../networking";
 
 interface MoveEditorProps {
 
@@ -21,8 +20,8 @@ interface MoveEditorProps {
 const newMoveTemplate: Move = {
   "cat": "unmade",
   "name": "newMove",
-  "overview": "Brief reminder of the ability.",
-  "description": "A detailed description of what it does. Perhaps it is somewhat long.",
+  "overview": "",
+  "description": "",
   "color": [_.random(0, 255), _.random(0, 255), _.random(0, 255)],
   "implementation": null,
   "symbol": "+",
@@ -35,11 +34,8 @@ interface MoveSelectModalProps {
 const MoveSelectModal: FC<MoveSelectModalProps> = ({setSelectedMove}) => {
   const [isShown, setShown] = useState<boolean>(false);
   const moves = chessStore(state => state.userMoves)
-  useEffect(() => {
-    fetchMoves()
-  }, [isShown])
   return <div>
-  <Button onClick={() => setShown(true)} className="h-5 w-20">
+  <Button onClick={() => setShown(true)} className="h-3 w-30">
     Make another move
   </Button>
   <Modal
@@ -127,8 +123,8 @@ export const MoveEditor: FC<MoveEditorProps> = ({ }) => {
       <div className='col-span-1'>
         <MoveIcon move={move} />
       </div>
-      <Textarea value={move.overview} onChange={updateMoveOverview} className="px-r mx-0.5 col-span-3 text-m bg-slate-100 h-18" />
-      <Textarea value={move.description} onChange={updateMoveDescription} className="px-2 mx-0.5 col-span-8 text-m bg-slate-100 h-18" />
+      <Textarea value={move.overview} onChange={updateMoveOverview} placeholder="Concise reminder of the ability" className="px-r mx-0.5 col-span-3 text-m bg-slate-100 h-18" />
+      <Textarea value={move.description} onChange={updateMoveDescription} placeholder="A detailed description of what this move does." className="px-2 mx-0.5 col-span-8 text-m bg-slate-100 h-18" />
     </div>
     <div className='inline-flex'>
       Color

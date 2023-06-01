@@ -1,17 +1,15 @@
 import React, { FC, useEffect } from 'react'
 import _ from 'lodash'
-import { chessStore, updatePkToPiece } from '../store';
-import { BoardSetupMeta, Game, LobbySetup } from './types';
-import { makeGameSocket } from './GameView';
-import { pieceMapToBoardSetup } from './utils'
-import { api, getBoardSetups, addToLobby } from '../networking';
+import { chessStore, setErrorMessage } from '../store';
+import { BoardSetupMeta, } from './types';
+
 interface SimpleBoardViewProps {
   boardSetup: BoardSetupMeta
 }
 
 const SimpleBoardView: FC<SimpleBoardViewProps> = ({ boardSetup }) => {
   return <div className="grid grid-cols-8 grid-rows-8 gap-x-0 w-50 border-gray-900 border-2 p-0 m-0">
-    {boardSetup.board_setup.map((boardLine, row) => {
+    {boardSetup.boardSetup.map((boardLine, row) => {
       const pkToPiece = chessStore((state) => state.pkToPiece)
       return boardLine.map((boardCell, col) => {
         const parity = (row + col) % 2 === 0 ? 'dark' : 'light';
@@ -21,17 +19,25 @@ const SimpleBoardView: FC<SimpleBoardViewProps> = ({ boardSetup }) => {
         } else {
           grid_style += " bg-grid_dark"
         }
-        let inner_element = <></>
+        let inner_piece = <div className="relative"/>
+        let inner_royal = <></>
         if (boardCell != null) {
           let image_url = ''
-          const piece = pkToPiece.get(boardCell.piece_pk)!
+          const piece = pkToPiece.get(boardCell.piecePk)!
           if (boardCell.team == 'white') {
-            image_url = piece.image_white
+            image_url = piece.imageWhite
           } else {
-            image_url = piece.image_black
+            image_url = piece.imageBlack
           }
-          inner_element = <img draggable="false" src={image_url} />
+          inner_piece = <img draggable="false" className="relative" src={image_url} />
+          if (boardCell.isRoyal) {
+            inner_royal = <img draggable="false" src="media/crown.png" className="absolute top-0 left-0 h-3 w-3 rotate-12 mx-4 -my-1 rounded-md drop-shadow-md"/>
         }
+        }
+        let inner_element = <div className='relative'>
+          {inner_piece}
+          {inner_royal}
+        </div>
         return <div className={grid_style} key={row * 15 + col}>
           {inner_element}
         </div>
@@ -47,15 +53,6 @@ export const Lobby: FC<LobbyProps> = () => {
   const boardSetups = chessStore((state) => state.boardSetups)
   const lobby = chessStore((state) => state.lobby)
   const lobbySetups = chessStore((state) => state.lobbySetups)
-  const setErrorMessage = chessStore((state) => state.setErrorMessage)
-  useEffect(() => {
-    getBoardSetups()
-    api.get('/games').then((response) => {
-      const data = response.data;
-      updatePkToPiece(data['pieces'])
-      addToLobby(data['game_requests'], false)
-    });
-  }, [])
   return <div>
     <p>Join an existing game</p>
     <div className="inline-block">
@@ -73,10 +70,10 @@ export const Lobby: FC<LobbyProps> = () => {
           )
         };
         return <button key={lobbySetup.pk.toString()} className="col-span-1 m-2 bg-neutral-200" onClick={requestGameClicked}>
-          <SimpleBoardView boardSetup={lobbySetup.board_setup_meta}></SimpleBoardView>
-          <p>{lobbySetup.board_setup_meta.name}</p>
-          {/* <p className='text-xs'>by {lobbySetup.board_setup.author}</p> */}
-          <p className='text-m'>vs {lobbySetup.requesting_user}</p>
+          <SimpleBoardView boardSetup={lobbySetup.boardSetupMeta}></SimpleBoardView>
+          <p>{lobbySetup.boardSetupMeta.name}</p>
+          {/* <p className='text-xs'>by {lobbySetup.boardSetup.author}</p> */}
+          <p className='text-m'>vs {lobbySetup.requestingUser}</p>
         </button>
       })}
     </div>

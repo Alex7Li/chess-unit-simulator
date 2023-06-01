@@ -47,6 +47,11 @@ Blockly.Blocks['unit_on_tile'] = {
   }
 };
 
+pyGen['unit_on_tile'] = (block: Blockly.Block) => {
+  const code = pyGen.valueToCode(block, 'VALUE', pyGen.ORDER_MEMBER)['piece']
+  return [code, pyGen.ORDER_MEMBER]
+}
+
 Blockly.Blocks['tile_of_unit'] = {
   init: function() {
     this.jsonInit({
@@ -65,6 +70,11 @@ Blockly.Blocks['tile_of_unit'] = {
   }
 };
 
+pyGen['tile_of_unit'] = (block: Blockly.Block) => {
+  const code = 'tile_of(' + pyGen.valueToCode(block, 'VALUE', pyGen.ORDER_NONE) + ')'
+  return [code, pyGen.ORDER_FUNCTION_CALL]
+}
+
 Blockly.Blocks['targeted_tile'] = {
   init: function() {
     this.jsonInit({
@@ -78,6 +88,38 @@ Blockly.Blocks['targeted_tile'] = {
 
 pyGen['targeted_tile'] = (block: Blockly.Block) => {
   return ['context.targeted_tile', pyGen.ORDER_MEMBER]
+}
+
+Blockly.Blocks['path'] = {
+  init: function() {
+    this.jsonInit({
+      "colour": 100,
+      "message0": "Path from %1 to %2",
+      "args0": [
+          {
+            "type": "input_value",
+            "name": "FROM_TILE",
+            "check": "Tile"
+          },
+          {
+            "type": "input_value",
+            "name": "TO_TILE",
+            "check": "Tile"
+          },
+      ],
+      "output": "Tile_Array",
+      "inputsInline": true,
+    })
+    this.setTooltip('Get every tile on the path between two tiles. Moving from [0,0] to [3,6], the path would be {(0,0), (1, 2), (2, 4), (3, 6)]');
+  }
+}
+
+pyGen['path'] = (block: Blockly.Block) => {
+  const code = 'context.path(' +
+    pyGen.valueToCode(block, 'FROM_TILE', pyGen.ORDER_NONE) + ", " + 
+    pyGen.valueToCode(block, 'TO_TILE', pyGen.ORDER_NONE) + ")\r\n"
+
+  return [code, pyGen.ORDER_MEMBER]
 }
 
 /*
@@ -105,26 +147,7 @@ pyGen['chess_action'] = (block: Blockly.Block) => {
   return code
 }
 
-Blockly.Blocks['attack'] = {
-  init: function() {
-    this.jsonInit({
-      "colour": 200,
-      "message0": "Attack %1",
-      "args0": [
-          {
-            "type": "input_value",
-            "name": "VALUE",
-            "check": "Unit"
-          }
-      ],
-      "nextStatement": null,
-      "previousStatement": null,
-    })
-    this.setTooltip('Destroy the specified unit and move to its square. [If there is no specified unit, or the movement is impossible, this action cannot be performed]');
-  }
-};
-
-Blockly.Blocks['move'] = {
+Blockly.Blocks['teleport'] = {
   init: function() {
     this.jsonInit({
       "colour": 200,
@@ -149,31 +172,38 @@ Blockly.Blocks['move'] = {
   }
 }
 
-pyGen['move'] = (block: Blockly.Block) => {
-  const code = 'context.move_to(' +
+pyGen['teleport'] = (block: Blockly.Block) => {
+  const code = 'context.tele_to(' +
     pyGen.valueToCode(block, 'FROM_UNIT', pyGen.ORDER_NONE) + ", " + 
     pyGen.valueToCode(block, 'TO_TILE', pyGen.ORDER_NONE) + ")\r\n"
 
   return code
 }
 
-Blockly.Blocks['move_or_attack'] = {
+Blockly.Blocks['take'] = {
   init: function() {
     this.jsonInit({
       "colour": 200,
-      "message0": "Move or Attack %1",
+      "message0": "take %1",
       "args0": [
           {
             "type": "input_value",
-            "name": "VALUE",
-            "check": "Tile"
+            "name": "TARGET_UNIT",
+            "check": "Unit"
           }
       ],
+      "inputsInline": true,
       "nextStatement": null,
       "previousStatement": null,
     })
-    this.setTooltip('Move to the specified square. If there is a unit on that square, destroy the unit first.');
+    this.setTooltip('Remove this piece from the board.');
   }
-};
+}
+
+pyGen['take'] = (block: Blockly.Block) => {
+  const code = 'context.take(' +
+    pyGen.valueToCode(block, 'TARGET_UNIT', pyGen.ORDER_NONE) + ")\r\n"
+  return code
+}
 
 export {chessTheme, Blockly, pyGen as pythonGenerator}
