@@ -1,4 +1,5 @@
 import {Blockly} from '../blockly';
+import { GameResult } from './definitions';
 export interface Passive {
   implementation: string
 }
@@ -7,7 +8,6 @@ export interface Move {
   cat: string; //max length 15
   color: Array<number>; // stored in rgb
   implementation: Blockly.WorkspaceSvg | null
-  name: string; // max length 31
   overview: string; // max length 127
   description: string;
   symbol: string; // max length 3
@@ -85,5 +85,6 @@ export type Game = {
   isPlayingBlack: boolean,
   gameState: GameState,
   boardName: string,
-  pk: number
+  pk: number,
+  result: GameResult
 }

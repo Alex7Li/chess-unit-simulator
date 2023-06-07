@@ -83,7 +83,7 @@ const App: FC = () => {
           text="Lobby to create games and join games made by other players."/></div>}><Lobby></Lobby></Tabs.Item>
         {
           games.map((game, idx) => {
-            return <Tabs.Item key={'game_' + idx} active={false} title={game.boardName}><GameView game_info={game}></GameView></Tabs.Item>
+            return <Tabs.Item key={'game_' + idx} active={false} title={game.boardName}><GameView gameInfo={game}></GameView></Tabs.Item>
           })
         }
         <Tabs.Item title={<div className='inline-flex'>Move Editor<HelpModal text="Create custom moves to add to your pieces!" /></div>}>

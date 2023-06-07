@@ -90,11 +90,16 @@ class Moves(APIView):
         move_query = json.loads(request.query_params.get('newMove'))
         if not request.user.is_authenticated:
             return ResponseWithMessage("You must be logged in to save", status=status.HTTP_401_UNAUTHORIZED)
-        user = User.objects.get(('id', request.user.id))
-        move = Move(author=user, name=move_query['name'], cat=Move.Category.CUSTOM,
-             color=to_color_string(move_query['color']), implementation=move_query['implementation'],
-             overview=move_query['overview'],
-             description=move_query['description'], symbol=move_query['symbol'])
+        user = User.objects.get(id=request.user.id)
+        move, was_created = Move.objects.update_or_create(
+            pk=move_query['pk'],
+            defaults={'cat':Move.Category.CUSTOM, 'color': to_color_string(move_query['color']),
+                      'overview': move_query['overview'], 'description': move_query['description'],
+                      'symbol': move_query['symbol'], 'implementation': move_query['implementation']}
+        )
+        if not was_created and user != move.author:
+            return ResponseWithMessage("Cannot modify this move as someone else created it.", status=status.HTTP_401_UNAUTHORIZED)
+        move.author = user
         try:
             move.full_clean()
             move.save()

@@ -1,10 +1,12 @@
 import React, { FC, useRef, useState, useEffect } from "react";
 import _ from 'lodash'
-import { chessStore, updateGame } from "../store";
+import { chessStore, updateGame, exitGame } from "../store";
 import { Game, GameState, GameTile, GamePiece } from "./types";
 import PieceView from "./PieceView";
 import MoveIcon from "./MoveIcon";
 import { gameStateFromDjango } from "../networking";
+import { GameResult } from "./definitions";
+import { Button } from "flowbite-react";
 
 // Related file: api/consumers
 export const makeGameSocket = (gamePk: number) => {
@@ -21,11 +23,15 @@ export const makeGameSocket = (gamePk: number) => {
       })
     } else if (data['event_type'] == "board_update") {
       const newState = gameStateFromDjango(data['game_data']['game_state'])
-      updateGame(gamePk, newState)
+      updateGame(gamePk, newState, data['game_data']['result'])
     }
   }
 
   gameSocket.onclose = function (m) {
+    if (m.code == 1000) {
+      // Successful, closed as game is finished
+      return
+    }
     console.error('Game socket closed with message: ');
     console.error(m)
       chessStore.setState(() => {
@@ -106,14 +112,14 @@ const PlayBoardView: FC<PlayBoardViewProps> = ({ locToHandler, gameState, select
 
 
 interface GameProps {
-  game_info: Game
+  gameInfo: Game
 }
 
-export const GameView: FC<GameProps> = ({game_info}) => {
+export const GameView: FC<GameProps> = ({gameInfo}) => {
   const [selTile, setSelectedTile] = useState<GameTile | null>(null)
   const locToHandler = (row: number, col: number) => {
       const handlerFunc: React.MouseEventHandler<HTMLButtonElement> = (e) => {
-      let selectedPiece: null | GamePiece = game_info.gameState[row][col].piece
+      let selectedPiece: null | GamePiece = gameInfo.gameState[row][col].piece
       if (selTile == null) {
         // Left click to select a location when no location is selected
         if (e.button == 0) {
@@ -149,7 +155,7 @@ export const GameView: FC<GameProps> = ({game_info}) => {
               });
             } else {
               // Otherwise, make the move
-              game_info.websocket.send(JSON.stringify(
+              gameInfo.websocket.send(JSON.stringify(
                 {
                   'from_loc': [selTile.row, selTile.col],
                   'to_loc': [row, col],
@@ -168,17 +174,28 @@ export const GameView: FC<GameProps> = ({game_info}) => {
     }
     return handlerFunc
   }
+  let endText = ""
+  switch (gameInfo.result) {
+    case GameResult.BLACK_WIN:
+      endText = "Black wins"; break;
+    case GameResult.WHITE_WIN:
+      endText = "White wins"; break;
+    case GameResult.DRAW:
+      endText = "Draw"; break;
+    case GameResult.IN_PROGRESS:
+  }
   return <div>
-    <p>{game_info.isPlayingWhite ? "White: you" : "White: someone else"} </p>
-    <p>{game_info.isPlayingBlack ? "Black: you" : "Black: someone else"} </p>
+    <p>{gameInfo.isPlayingWhite ? "White: you" : "White: someone else"} </p>
+    <p>{gameInfo.isPlayingBlack ? "Black: you" : "Black: someone else"} </p>
     <div className="grid md:grid-cols-2">
       <div className="col-span-1">
-        <PlayBoardView locToHandler={locToHandler} gameState={game_info.gameState} selectedTile={selTile}/>
+        <PlayBoardView locToHandler={locToHandler} gameState={gameInfo.gameState} selectedTile={selTile}/>
       </div>
       <div className="col-span-1">
         {selTile?.piece == null ? <></> : 
         <PieceView piece={selTile.piece}></PieceView>}
       </div>
     </div>
+    {endText == "" ? <></> : <div>{endText}<Button onClick={() => exitGame(gameInfo.pk)}>Exit game</Button></div>}
   </div>
 }

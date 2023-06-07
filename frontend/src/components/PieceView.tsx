@@ -4,6 +4,7 @@ import { FaceSmileIcon } from '@heroicons/react/24/outline'
 import _ from 'lodash'
 import MoveIcon from './MoveIcon'
 import { chessStore } from "../store";
+import { CANCEL_MOVE_PK } from "./definitions";
 interface PieceViewProps {
   piece: Piece
 }
@@ -52,7 +53,7 @@ export const MovesView: FC<MovesViewProps> = ({ moveGrid, changeMoveGrid, select
                 const newGrid = _.cloneDeep(moveGrid);
                 // Erase if we are using the cancel item, or if
                 // the mouse is holding down the right click button.
-                if (selectedMove.name == 'cancel' || mouseDownState == 2 || ("mousedown" && e.button == 2)) {
+                if (selectedMove.pk == CANCEL_MOVE_PK || mouseDownState == 2 || ("mousedown" && e.button == 2)) {
                   newGrid[row][col] = null;
                   newGrid[row][15 - col - 1] = null;
                 } else {
@@ -76,7 +77,7 @@ export const MovesView: FC<MovesViewProps> = ({ moveGrid, changeMoveGrid, select
 const PieceView: FC<PieceViewProps> = ({ piece }) => {
   const pkToMove = chessStore((state) => state.pkToMove)
   return <div>
-    <p className='inline-flex'><img draggable="false" src={piece.image_white} />{piece.name}</p>
+    <p className='inline-flex'><img draggable="false" src={piece.imageWhite} />{piece.name}</p>
 
     <div className='container mx-auto p-1' onContextMenu={(e) => e.preventDefault()}>
       <MovesView moveGrid={piece.moves}/>

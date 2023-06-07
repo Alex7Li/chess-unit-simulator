@@ -3,7 +3,6 @@ import { Tabs, Modal, Tooltip, Card, Textarea, Button, Label, TextInput } from "
 import _, { update } from 'lodash'
 import { MoveGrid, Move, Piece } from './types'
 import MoveIcon from './MoveIcon'
-import { ImplementationHelpModal } from "./HelpModal";
 import { IntegerInput } from "./NumericInput"
 import { SaveElement, SaveState } from "./utils";
 import { api } from "../App"
@@ -19,28 +18,31 @@ interface MoveEditorProps {
 
 const newMoveTemplate: Move = {
   "cat": "unmade",
-  "name": "newMove",
   "overview": "",
   "description": "",
   "color": [_.random(0, 255), _.random(0, 255), _.random(0, 255)],
   "implementation": null,
-  "symbol": "+",
+  "symbol": "",
   "pk": -2,
 }
-
 interface MoveSelectModalProps {
   setSelectedMove: (move: Move) => void
+}
+
+interface ViewCodeModalProps {
+  pythonCode: string
 }
 const MoveSelectModal: FC<MoveSelectModalProps> = ({setSelectedMove}) => {
   const [isShown, setShown] = useState<boolean>(false);
   const moves = chessStore(state => state.userMoves)
   return <div>
   <Button onClick={() => setShown(true)} className="h-3 w-30">
-    Make another move
+    Manage created moves
   </Button>
   <Modal
     show={isShown}
     onClose={() => setShown(false)}
+    className="z-[200]"
   >
     <Modal.Header>
       Select move to edit, or create a new move
@@ -55,26 +57,49 @@ const MoveSelectModal: FC<MoveSelectModalProps> = ({setSelectedMove}) => {
   </Modal>
 </div>
 }
+const ViewCodeModal: FC<ViewCodeModalProps> = ({pythonCode}) => {
+  const [isShown, setShown] = useState<boolean>(false);
+  return <div>
+  <Button onClick={() => setShown(true)} className="h-3 w-30">
+    View generated code
+  </Button>
+  <Modal
+    show={isShown}
+    onClose={() => setShown(false)}
+  >
+    <Modal.Header>
+      Generated python code (<a style={{"textDecoration":"underline", "color":"blue"}} href="https://github.com/Alex7Li/chess-unit-simulator/blob/main/api/game_logic.py">View context</a>)
+    </Modal.Header>
+    <Modal.Body>
+      <pre lang="python">
+        {pythonCode?pythonCode:"No code was generated"}
+      </pre>
+    </Modal.Body>
+  </Modal>
+</div>
+}
 
 export const MoveEditor: FC<MoveEditorProps> = ({ }) => {
   const [move, setMove] = useState(newMoveTemplate);
   const [saveStatus, setSaveStatus] = useState<SaveState>("ok")
-  const blocklyRef = useRef(null);
-  const [xml, setXml] = useState();
-  const [editMoveId, setEditMoveId] = useState<undefined | number>(undefined)
+  const [pythonCode, setPythonCode] = useState<string>("")
+  const [initialState, setInitialState] = useState<null | {[key: string]: any}>(null)
   const setSelectedMove = (move: Move) => {
     setMove(move);
-    setEditMoveId(move.pk);
+    setInitialState(move.implementation)
   }
   const updateMoves = chessStore((store) => store.updateMoves)
 
-  const saveMove = () => {
+  const saveMove = (edit: boolean) => {
     if(move['implementation'] == null) {
       setSaveStatus('fail')
       console.error("No move implementation given")
       return
     }
     setSaveStatus('saving')
+    if(edit == false) {
+      move.pk = -2
+    }
     api.post("/moves", {}, {
       params: {
         newMove: move,
@@ -105,7 +130,6 @@ export const MoveEditor: FC<MoveEditorProps> = ({ }) => {
     }
   }
   
-  const updateMoveName = immutableUpdateMoveFromHandler((v, m) => m.name = v);
   const updateMoveDescription = immutableUpdateMoveFromHandler((v, m) => m.description = v);
   const updateMoveOverview = immutableUpdateMoveFromHandler((v, m) => m.overview = v);
   const updateMoveSymbol = immutableUpdateMoveFromHandler((v, m) => m.symbol = v);
@@ -147,27 +171,25 @@ export const MoveEditor: FC<MoveEditorProps> = ({ }) => {
         maxLength={3}
       />
     </div>
-    <div className="inline-flex">
-      <label className='flex'>
-        <input type='text' value={move.name} onChange={updateMoveName} className="p-0 m-0.5 w-40 max-w-2xl grow" />
-        <p className='h-0 w-fit whitespace-nowrap'></p>
-      </label>
-      <ImplementationHelpModal />
-    </div>
     <div id="blocklyArea" style={{"height": '30rem'}}>
       <ImplementationSandbox
       onCodeChange={(workspace) => {
+        const code = pythonGenerator.workspaceToCode(workspace)
+        console.log(code)
         const workspace_json = Blockly.serialization.workspaces.save(workspace);
         updateMoveImplementation(workspace_json)
+        setPythonCode(code)
       }}
       divId="blocklyArea"
       readOnly={false}
-      initialState={null}/>
+      initialState={initialState}/>
     </div>
     <div className='inline-flex'>
-      <Button onClick={saveMove}>Save</Button>
+      <Button onClick={()=>saveMove(false)}>Save as new move</Button>
+      {move.pk == -2 ? <></> : <Button onClick={()=>saveMove(true)}>Overwrite existing move</Button>}
       <SaveElement savingState={saveStatus} />
       <MoveSelectModal setSelectedMove={setSelectedMove}/>
+      <ViewCodeModal pythonCode={pythonCode}/>
     </div>
   </Card>
   </div>

@@ -7,6 +7,9 @@ Example usage:
 */
 import React, {FC, useEffect} from "react";
 import {Blockly, chessTheme} from '../blockly';
+// @ts-ignore
+import { TypedVariableModal } from '@blockly/plugin-typed-variable-modal';
+
 
 interface ImplementationSandboxProps {
   onCodeChange : null | ((workspace: Blockly.WorkspaceSvg) => void)
@@ -50,6 +53,10 @@ const toolbox = {
         },
         {
           "kind": "block",
+          "type": "unit_is_on_tile"
+        },
+        {
+          "kind": "block",
           "type": "tile_of_unit"
         },
         {
@@ -64,7 +71,29 @@ const toolbox = {
       "contents": [
         {
           "kind": "block",
-          "type": "path"
+          "type": "path",
+          "inputs": {
+            "BEGIN_EXCLUSIVE": {
+              "block": {
+                "type": "math_number",
+                "fields": {
+                  "NUM": 1
+                }
+              }
+            },
+            "END_EXCLUSIVE": {
+              "block": {
+                "type": "math_number",
+                "fields": {
+                  "NUM": 1
+                }
+              }
+            },
+          }
+        },
+        {
+          "kind": "block",
+          "type": "for_all_tiles"
         }
       ]
     },
@@ -103,7 +132,7 @@ const toolbox = {
     {
       "kind": "category",
       "name": "Variables",
-      "custom": "VARIABLE"
+      "custom": "CREATE_TYPED_VARIABLE"
     },
     {
       "kind": "category",
@@ -134,6 +163,10 @@ const toolbox = {
         {
           "kind": "block",
           "type": "logic_operation"
+        },
+        {
+          "kind": "block",
+          "type": "logic_negate"
         },
         {
           "kind": "block",
@@ -168,8 +201,7 @@ export const ImplementationSandbox: FC<ImplementationSandboxProps> = ({onCodeCha
       theme: chessTheme, readOnly: readOnly});
     if(onCodeChange != null) {
       workspace.addChangeListener(() => 
-        // @ts-ignore
-        onCodeChange(workspace)
+        onCodeChange(workspace!)
       );
     }
     if (initialState != null) {
@@ -200,9 +232,32 @@ export const ImplementationSandbox: FC<ImplementationSandboxProps> = ({onCodeCha
     // Otherwise, our code will fire immediately and the size will be 0, since
     // tab is hidden.
     onVisible(blocklyDiv, onResize);
+
+    const createFlyout = function(workspace: Blockly.WorkspaceSvg) {
+      let xmlList = [];
+      // Add your button and give it a callback name.
+      const button = document.createElement('button');
+      button.setAttribute('text', 'Create Typed Variable');
+      button.setAttribute('callbackKey', 'callbackName');
+  
+      xmlList.push(button);
+  
+      // This gets all the variables that the user creates and adds them to the
+      // flyout.
+      // @ts-ignore
+      const blockList: HTMLButtonElement[] = Blockly.VariablesDynamic.flyoutCategoryBlocks(workspace);
+      xmlList = xmlList.concat(blockList);
+      return xmlList;
+    };
+
+    workspace.registerToolboxCategoryCallback('CREATE_TYPED_VARIABLE', createFlyout);
+    const typedVarModal = new TypedVariableModal(workspace, 'callbackName', 
+    [["TileList", "TileList"], ["Tile", "Tile"], ["Unit", "Unit"], ['Boolean','Boolean'], ['Number', 'Number']]);
+    typedVarModal.init();
+
     return () => {
       document.getElementById(blocklyDivId)?.remove()
     }
-  }, [])
+  }, [initialState])
   return <></>
 }

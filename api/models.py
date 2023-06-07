@@ -13,6 +13,7 @@ from django.core.exceptions import ValidationError
 from django.contrib.auth.models import User
 from django.core.files import File
 from django.db.utils import IntegrityError
+from func_timeout import FunctionTimedOut
 from rest_framework import serializers
 
 import api.game_logic
@@ -41,7 +42,6 @@ def validate_simple_name(value):
 
 class Move(models.Model):
     author = models.ForeignKey(User, on_delete=models.CASCADE)
-    name = models.CharField("Move name", max_length=63, unique=True)
     class Category(models.TextChoices):
         UI = 'UI'
         OFFICIAL = 'official'
@@ -57,7 +57,7 @@ class Move(models.Model):
     symbol = models.CharField(blank=True, max_length=3)
 
     def __str__(self):
-        return f"Move: {self.name} by {self.author}"
+        return f"Move {self.pk}: {self.overview} by {self.author}"
 
     class Meta:
         indexes = [models.Index(fields=['author'])]
@@ -72,7 +72,7 @@ class MoveSerializer(serializers.ModelSerializer):
 
     class Meta:
         model = Move
-        fields = ['pk', 'cat', 'color', 'implementation', 'name', 'overview', 'description', 'symbol', 'author']
+        fields = ['pk', 'cat', 'color', 'implementation', 'overview', 'description', 'symbol', 'author']
 
 class Piece(models.Model):
     image_white = models.ImageField(upload_to="pieces/")
@@ -373,7 +373,7 @@ class Game(models.Model):
             raise ValidationError("Could not find a piece to move")
         if (piece['team'] != 'white' and self.white_to_move) or (piece['team'] != 'black' and not self.white_to_move):
             raise ValidationError(f"It's not currently {piece['team']}'s turn to move!")
-            
+
         rel_row = to_loc[0] - from_loc[0]
         rel_col = to_loc[1] - from_loc[1]
         move = None
@@ -395,13 +395,21 @@ class Game(models.Model):
 
         # Make the move!
         try:
-            if not api.game_logic.make_move(
-                response.text, board, api.game_logic.Location(*from_loc), api.game_logic.Location(*to_loc)):
-                return False # This move is not a valid one
+            result = api.game_logic.make_move(response.text,
+                board, api.game_logic.Location(*from_loc), api.game_logic.Location(*to_loc))
         except AttributeError:
             raise ValidationError("This move could not be executed. Try another move instead.")
+        except api.game_logic.InvalidMoveError:
+            raise ValidationError("You cannot play this move from this position.")
+        except FunctionTimedOut:
+            raise ValidationError("It took too long to execute this move (>1 sec), there may be an infinite loop. Try another move instead.")
+        except (SyntaxError, NameError) as e:
+            raise ValidationError(f"This move did not compile correctly, see the error trace:\n" + repr(e))
+        if not result.did_action:
+            raise ValidationError(f"You cannot play this move as it would do nothing.")
+
         end_pieces = count_surviving_pieces(board)
-        self.game_state['result'] = get_game_result(
+        self.result = get_game_result(
             start_pieces, end_pieces, self.game_state['wincon_white'], self.game_state['wincon_black'])
 
         # Convert keys from tuple back to a json-able string and flip board back for black
@@ -414,7 +422,6 @@ class Game(models.Model):
 
         self.game_state['board'] = new_board
         self.white_to_move = not self.white_to_move
-
         self.save()
         return True
 
@@ -464,5 +471,5 @@ class GameSerializer(serializers.ModelSerializer):
 
     class Meta:
         model = Game
-        fields = ['pk',  'white_user', 'black_user', 'white_to_move', 'game_state']
+        fields = ['pk',  'white_user', 'black_user', 'white_to_move', 'game_state', 'result']
 

@@ -152,7 +152,7 @@ class GameConsumer(WebsocketConsumer):
         from_loc = tuple(text_data_json['from_loc'])
         to_loc = tuple(text_data_json['to_loc'])
         try:
-            if (game.make_move(from_loc, to_loc)):
+            if game.make_move(from_loc, to_loc):
                 # Successful move
                 async_to_sync(self.channel_layer.group_send)(
                     self.group_name,
@@ -173,7 +173,7 @@ class GameConsumer(WebsocketConsumer):
                 "event_type": "invalid_move",
                 "message": str(e)
                 }))
-        
+
 
     # Receive message from room group
     def send_to_socket(self, event):

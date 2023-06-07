@@ -10,8 +10,8 @@ import { SaveElement, SaveState } from "./utils";
 import { api } from "../App"
 import { moveGridToMap } from './utils'
 import { chessStore, updatePieces } from "../store";
-import {pythonGenerator} from '../blockly';
 import { ImplementationSandbox } from "./ImplementationSandbox";
+import { CANCEL_MOVE_PK } from './definitions'
 
 const initMoveGrid: MoveGrid = Array.from({ length: 15 }).map(() => {
   return Array.from({ length: 15 }).map(() => {
@@ -34,8 +34,8 @@ export const MoveSelect: FC<MoveSelectProps> = ({moves, onClick, highlightedMove
         if (move === highlightedMove) {
           buttonClassName += " bg-stone-600"
         }
-        return <Tooltip animation={false} content={move.name + ": " + move.overview} key={idx}>
-          <button onClick={(e) => { onClick(move) }} className={buttonClassName}><MoveIcon move={move} />
+        return <Tooltip animation={false} content={move.overview == "" ? "New move": move.overview} key={idx}>
+          <button onClick={(e) => { onClick(_.cloneDeep(move)) }} className={buttonClassName}><MoveIcon move={move} />
           </button></Tooltip>
       })}
     </>
@@ -62,7 +62,7 @@ const PieceEditor: FC<PieceEditorProps> = () => {
     "overview": "Use to delete an action. ",
     "description": "Delete an action you added before. Left click works as well.",
     "symbol": "\u232B",
-    "pk": -1,
+    "pk": CANCEL_MOVE_PK,
   }, ...moves_orig]
   const [selectedMove, selectMove] = useState<Move>(moves[0]);
   const [saveStatus, setSaveStatus] = useState<SaveState>("ok")
@@ -125,7 +125,7 @@ const PieceEditor: FC<PieceEditorProps> = () => {
           />
         </div>
         <div className='container mx-auto p-1' onContextMenu={(e) => e.preventDefault()}>
-          <MovesView moveGrid={moveGrid} changeMoveGrid={changeMoveGrid} selectedMove={selectedMove} pkToMove={pk_to_move} />
+          <MovesView moveGrid={moveGrid} changeMoveGrid={changeMoveGrid} selectedMove={selectedMove} />
         </div>
         <div className='container mx-auto p-1'>
           {
@@ -142,9 +142,6 @@ const PieceEditor: FC<PieceEditorProps> = () => {
           <Tabs.Item title="Actions">
             <MoveSelect onClick={(move: Move) => selectMove(move)} moves={moves} highlightedMove={selectedMove}/>
             <Card>
-              <label>
-                <p className='h-0 w-fit whitespace-nowrap'>{selectedMove.name}</p>
-              </label>
               <div className="grid grid-cols-12">
                 <div className='col-span-1'>
                   <MoveIcon move={selectedMove} />

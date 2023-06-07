@@ -5,7 +5,7 @@ import { initBoardSetup } from './components/utils'
 import { BoardSetup, Move, BoardSetupMeta, GameState } from './components/types'
 import { Game, LobbySetup } from './components/types';
 import { makeGameSocket } from './components/GameView';
-import { API_URL } from './components/definitions';
+import { API_URL, GameResult } from './components/definitions';
 import { chessStore, updatePieces, updatePkToMove, updatePkToPiece } from "./store";
 
 // We need to redeclare the api because this file is run
@@ -145,7 +145,7 @@ const updateBoardSetups = (djangoBoardSetups: BoardSetupDjangoMeta[]) => {
     }
   })
   chessStore.setState((state) => {
-    const mergedBoards = _.uniqBy([...state.boardSetups, ...newBoardSetups], (board) => board.pk)
+    const mergedBoards = _.uniqBy([...newBoardSetups, ...state.boardSetups], (board) => board.pk)
     return {
       boardSetups: mergedBoards
     }
@@ -231,7 +231,7 @@ export const addToLobby = (newLobbySetups: Array<DjangoLobbySetup>, merge: boole
     }
   })
   if (merge) {
-    const mergedLobby = _.uniqBy([...state.lobbySetups, ...fixedLobbySetups], (board) => board.pk)
+    const mergedLobby = _.uniqBy([...fixedLobbySetups, ...state.lobbySetups], (board) => board.pk)
     return {
       lobbySetups: mergedLobby
     }
@@ -273,7 +273,8 @@ export const setupLobbySocket = (lobbySocket: WebSocket) => {
             isPlayingBlack: is_black,
             boardName: data['game_name'],
             gameState: gameStateFromDjango(game_data['game_state']),
-            pk: game_pk
+            pk: game_pk,
+            result: GameResult.IN_PROGRESS,
           }
           return {games: [...state.games, newGame]}
           }

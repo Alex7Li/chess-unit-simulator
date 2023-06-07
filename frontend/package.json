@@ -10,6 +10,7 @@
     "preview": "vite preview"
   },
   "dependencies": {
+    "@blockly/plugin-typed-variable-modal": "^5.0.18",
     "@heroicons/react": "^2.0.13",
     "axios": "^0.21.1",
     "blockly": "^9.2.1",
@@ -24,6 +25,7 @@
     "react-blockly": "^7.0.1",
     "react-dom": "^18.2.0",
     "react-numeric-input": "^2.2.3",
+    "react-select": "^5.7.3",
     "react-sketch-canvas": "^6.2.0",
     "ts-node": "^10.9.1",
     "zustand": "^4.3.7"

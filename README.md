@@ -38,4 +38,4 @@ python manage.py shell
 ```
 
 ![frontend demo](/frontend_demo.gif)
-(demo is quite outdated)
+(demo is perpetually outdated)

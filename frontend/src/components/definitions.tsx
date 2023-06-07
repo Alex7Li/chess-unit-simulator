@@ -3,7 +3,17 @@ import convert from 'color-convert'
 import { Move, Piece } from './types'
 export const API_URL = 'http://127.0.0.1:8000/api'
 
+export const CANCEL_MOVE_PK = -1
+
 const default_lightness = 72;
+
+export enum GameResult {
+  WHITE_WIN = 'W',
+  BLACK_WIN = 'B',
+  DRAW = 'D',
+  IN_PROGRESS = "P"
+}
+
 export const PIECES: Array<Piece> = [
   {
     "name": "Delete", 
