@@ -39,3 +39,12 @@ python manage.py shell
 
 ![frontend demo](/frontend_demo.gif)
 (demo is perpetually outdated)
+
+Run production:
+
+```bash
+frontend$ yarn build
+$ python manage.py collectstatic
+$ docker-compose build
+$ docker-compose up
+```

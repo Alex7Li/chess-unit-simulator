@@ -29,3 +29,5 @@ secret_key.txt
 media/pieces
 
 db.sqlite3
+.env
+.my_pgpass

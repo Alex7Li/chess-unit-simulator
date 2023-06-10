@@ -10,7 +10,7 @@ import { ImplementationSandbox } from "./ImplementationSandbox";
 import { MoveSelect } from './PieceEditor'
 import { Blockly, pythonGenerator } from '../blockly';
 
-import { chessStore } from "../store";
+import { chessStore, updateMoves } from "../store";
 
 interface MoveEditorProps {
 
@@ -88,7 +88,6 @@ export const MoveEditor: FC<MoveEditorProps> = ({ }) => {
     setMove(move);
     setInitialState(move.implementation)
   }
-  const updateMoves = chessStore((store) => store.updateMoves)
 
   const saveMove = (edit: boolean) => {
     if(move['implementation'] == null) {

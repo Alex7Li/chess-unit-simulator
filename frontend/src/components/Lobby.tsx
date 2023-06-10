@@ -31,7 +31,7 @@ const SimpleBoardView: FC<SimpleBoardViewProps> = ({ boardSetup }) => {
           }
           inner_piece = <img draggable="false" className="relative" src={image_url} />
           if (boardCell.isRoyal) {
-            inner_royal = <img draggable="false" src="media/crown.png" className="absolute top-0 left-0 h-3 w-3 rotate-12 mx-4 -my-1 rounded-md drop-shadow-md"/>
+            inner_royal = <img draggable="false" src="static/crown.png" className="absolute top-0 left-0 h-3 w-3 rotate-12 mx-4 -my-1 rounded-md drop-shadow-md"/>
           }
         }
         const inner_element = <div className='relative'>

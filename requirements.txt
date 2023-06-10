@@ -1,7 +1,14 @@
-django
 channels[daphne]
 channels_redis
+django
 djangorestframework
 django-cors-headers
+func-timeout
+load_dotenv
 pillow
+psycopg2-binary
 service-identity
+random-username
+requests
+wonderwords
+

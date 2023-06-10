@@ -268,7 +268,8 @@ class GameConsumerTest(TestCaseWithMockData):
         
         await communicator_wolf.send_json_to({
             'from_loc': [0, 0],
-            'to_loc': [1, 0]
+            'to_loc': [1, 0],
+            'event_type': 'move'
         })
         # One move as white
         wolf_alert = await communicator_wolf.receive_from()

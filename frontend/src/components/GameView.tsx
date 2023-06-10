@@ -1,12 +1,13 @@
 import React, { FC, useRef, useState, useEffect } from "react";
 import _ from 'lodash'
-import { chessStore, updateGame, exitGame } from "../store";
+import { chessStore, exitGame, updateGamePkToMove, updateGameMessage, setErrorMessage } from "../store";
 import { Game, GameState, GameTile, GamePiece } from "./types";
 import PieceView from "./PieceView";
 import MoveIcon from "./MoveIcon";
-import { gameStateFromDjango } from "../networking";
+import { updateGame, DjangoGameData } from "../networking";
 import { GameResult } from "./definitions";
 import { Button } from "flowbite-react";
+import { format_username, isYourMove } from './utils'
 
 // Related file: api/consumers
 export const makeGameSocket = (gamePk: number) => {
@@ -14,17 +15,19 @@ export const makeGameSocket = (gamePk: number) => {
     'ws://' + window.location.host
     + '/ws/game/' + gamePk.toString() + '/'
   );
-  
+
   gameSocket.onmessage = function (m) {
     const data = JSON.parse(m.data);
     if ((data['event_type'] == 'invalid_move') || (data['event_type'] == 'fail')){
-      chessStore.setState(() => {
-        return {errorMessage: data['message']}
-      })
-    } else if (data['event_type'] == "board_update") {
-      const newState = gameStateFromDjango(data['game_data']['game_state'])
-      updateGame(gamePk, newState, data['game_data']['result'])
+      updateGameMessage(gamePk, data['message'])
+    } else if (data['event_type'] == "board_update" || // played a move
+               data['event_type'] == "agreement" // resign/draw offer
+    ) {
+      const gameData: DjangoGameData = data['game_data']
+      updateGamePkToMove(gameData['game_state']['moves'], gameData['pk'])
+      updateGame(gameData)
     }
+
   }
 
   gameSocket.onclose = function (m) {
@@ -34,9 +37,7 @@ export const makeGameSocket = (gamePk: number) => {
     }
     console.error('Game socket closed with message: ');
     console.error(m)
-      chessStore.setState(() => {
-        return {errorMessage: "Game socket has closed, the dev is bad! Todo: a way to reset connection"}
-      })
+    setErrorMessage("Game socket has closed, the dev is bad! Todo: a way to reset connection")
   }
   return gameSocket
 }
@@ -72,7 +73,7 @@ const PlayBoardView: FC<PlayBoardViewProps> = ({ locToHandler, gameState, select
         let inner_piece = <div className='relative h-12'/>
         let inner_icon = <></>
         let inner_royal = <></>
-        let image_url = null
+        let image_url = ""
         if (boardCell.piece != null) {
           if (boardCell.piece.team == "white") {
             image_url = boardCell.piece.imageWhite
@@ -81,7 +82,7 @@ const PlayBoardView: FC<PlayBoardViewProps> = ({ locToHandler, gameState, select
           }
           inner_piece = <img draggable="false" src={image_url} className="relative z-10"/>
           if (boardCell.piece.isRoyal) {
-            inner_royal = <img draggable="false" src="media/crown.png" className="absolute z-20 top-0 left-0 h-4 w-4 rotate-12 mx-8 -my-1 rounded-md drop-shadow-md"/>
+            inner_royal = <img draggable="false" src="static/crown.png" className="absolute z-20 top-0 left-0 h-4 w-4 rotate-12 mx-8 -my-1 rounded-md drop-shadow-md"/>
           }
         }
         if (selectedTile?.piece) {
@@ -157,6 +158,7 @@ export const GameView: FC<GameProps> = ({gameInfo}) => {
               // Otherwise, make the move
               gameInfo.websocket.send(JSON.stringify(
                 {
+                  'event_type': 'move',
                   'from_loc': [selTile.row, selTile.col],
                   'to_loc': [row, col],
                 })
@@ -174,28 +176,75 @@ export const GameView: FC<GameProps> = ({gameInfo}) => {
     }
     return handlerFunc
   }
-  let endText = ""
+  const resign = () => {
+    gameInfo.websocket.send(JSON.stringify(
+      {
+        'event_type': 'resign',
+      })
+    )
+  }
+  const offer_accept_draw = () => {
+    gameInfo.websocket.send(JSON.stringify(
+      {
+        'event_type': 'draw',
+      })
+    )
+  }
+  let whiteUser = format_username(gameInfo.whiteUser)
+  let blackUser = format_username(gameInfo.blackUser)
+  let endText = <span></span>
   switch (gameInfo.result) {
     case GameResult.BLACK_WIN:
-      endText = "Black wins"; break;
+      endText = <span>{blackUser} wins as Black</span>; break;
+    case GameResult.BLACK_WIN_RESIGN:
+      endText = <span>{whiteUser} resigns. {blackUser} wins as Black</span>; break;
     case GameResult.WHITE_WIN:
-      endText = "White wins"; break;
+      endText = <span>{whiteUser} wins as White</span>; break;
+    case GameResult.WHITE_WIN_RESIGN:
+      endText = <span>{blackUser} resigns. {whiteUser} wins as White</span>; break;
     case GameResult.DRAW:
-      endText = "Draw"; break;
+      endText = <span>Draw</span>; break;
+    case GameResult.DRAW_AGREED:
+      endText = <span>Draw by agreement</span>; break;
     case GameResult.IN_PROGRESS:
   }
+  let drawOfferText = "Offer Draw"
+  let drawDisabled = false
+  if (gameInfo.drawOffer != 'none') {
+    const username = chessStore.getState().username
+    if ((gameInfo.drawOffer == "black" && gameInfo.whiteUser == username) ||
+        (gameInfo.drawOffer == "white" && gameInfo.blackUser == username)) {
+      drawOfferText = "Accept Draw"
+    } else {
+      drawDisabled = true
+    }
+  }
+  const formattedMessage = gameInfo.errorMessage.replace('\\n', '\n')
+  let resignMessage = "Resign"
+  if (gameInfo.whiteUser == gameInfo.blackUser) {
+    if (gameInfo.whiteToMove){
+      resignMessage = "Resign as white"
+    } else {
+      resignMessage = "Resign as black"
+    }
+  }
   return <div>
-    <p>{gameInfo.isPlayingWhite ? "White: you" : "White: someone else"} </p>
-    <p>{gameInfo.isPlayingBlack ? "Black: you" : "Black: someone else"} </p>
+    <p>{whiteUser} (white) vs {blackUser} (black)</p>
     <div className="grid md:grid-cols-2">
       <div className="col-span-1">
         <PlayBoardView locToHandler={locToHandler} gameState={gameInfo.gameState} selectedTile={selTile}/>
+        {gameInfo.result == GameResult.IN_PROGRESS ? 
+        <div className="inline-flex">
+          <Button onClick={resign}>{resignMessage}</Button>
+          <Button onClick={offer_accept_draw} disabled={drawDisabled}>{drawOfferText}</Button>
+        </div>
+        : <div>{endText}<Button onClick={() => exitGame(gameInfo.pk)}>Exit game</Button></div>}
+        <p style={{whiteSpace:'pre-line'}}>{formattedMessage}</p>
       </div>
       <div className="col-span-1">
         {selTile?.piece == null ? <></> : 
         <PieceView piece={selTile.piece}></PieceView>}
       </div>
     </div>
-    {endText == "" ? <></> : <div>{endText}<Button onClick={() => exitGame(gameInfo.pk)}>Exit game</Button></div>}
   </div>
 }

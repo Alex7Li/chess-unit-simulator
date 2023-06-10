@@ -136,7 +136,11 @@ class GameConsumer(WebsocketConsumer):
         self.accept()
 
     def disconnect(self, close_code):
-        pass
+        if close_code == 1000:
+            try:
+                Game.objects.get(pk=self.game_id).delete()
+            except Game.DoesNotExist:
+                pass # already removed
 
     # Receive message from WebSocket
     def receive(self, text_data):
@@ -148,31 +152,93 @@ class GameConsumer(WebsocketConsumer):
                 "event_type": "fail"
                 }))
             return
-        game = Game.objects.get(('pk', self.game_id))
-        from_loc = tuple(text_data_json['from_loc'])
-        to_loc = tuple(text_data_json['to_loc'])
         try:
-            if game.make_move(from_loc, to_loc):
-                # Successful move
+            event_type = text_data_json['event_type']
+            try:
+                game = Game.objects.get(pk=self.game_id)
+            except Game.DoesNotExist:
+                self.send(text_data=json.dumps({
+                    "message": "This game has already ended",
+                    "event_type": "fail"
+                    }))
+                return
+            user_color = None
+            if game.white_user == requesting_user:
+                if game.black_user == requesting_user:
+                    user_color = 'white' if game.white_to_move else 'black'
+                else:
+                    user_color = 'white'
+            elif game.black_user == requesting_user:
+                    user_color = 'black'
+            if user_color == None:
+                self.send(text_data=json.dumps({
+                    "message": "Not participating in game, could not send request.",
+                    "event_type": "fail"
+                    }))
+            elif event_type == "resign":
+                game.resign(user_color)
                 async_to_sync(self.channel_layer.group_send)(
                     self.group_name,
                     {
                     "type": "send_to_socket",
-                    "event_type": "board_update",
+                    "event_type": "agreement",
                     "game_data": GameSerializer(game).data,
                     }
                 )
-            else:
-                # Move is not valid
-                self.send(text_data=json.dumps({
-                    "event_type": "invalid_move",
-                    "message": "You cannot move that piece to that location."
-                    }))
-        except ValidationError as e:
+            elif event_type == "draw":
+                cur_offer = game.game_state['draw_offer']
+                if game.black_user == game.white_user and cur_offer != 'none':
+                    # If you are playing as both users, accept the draw for 
+                    # the correct color.
+                    if cur_offer == 'black':
+                        game.draw('white')
+                    elif cur_offer == 'white':
+                        game.draw('black')
+                else:
+                    game.draw(user_color)
+                async_to_sync(self.channel_layer.group_send)(
+                    self.group_name,
+                    {
+                        "type": "send_to_socket",
+                        "event_type": "agreement",
+                        "game_data": GameSerializer(game).data,
+                    }
+                )
+            elif event_type == "move":
+                from_loc = tuple(text_data_json['from_loc'])
+                to_loc = tuple(text_data_json['to_loc'])
+                try:
+                    if game.make_move(from_loc, to_loc, requesting_user):
+                     # Successful move
+                     async_to_sync(self.channel_layer.group_send)(
+                        self.group_name,
+                            {
+                            "type": "send_to_socket",
+                            "event_type": "board_update",
+                            "game_data": GameSerializer(game).data,
+                            }
+                        )
+                    else:
+                        # Move is not valid
+                        self.send(text_data=json.dumps({
+                            "event_type": "invalid_move",
+                            "message": "You cannot move that piece to that location."
+                            }))
+                except (ValidationError, SyntaxError, NameError) as e:
+                    if isinstance(e, SyntaxError) or isinstance(e, NameError):
+                        message = "Failed to compile this code, see the error trace:\n" + repr(e)
+                    else:
+                        message = repr(e)
+                    self.send(text_data=json.dumps({
+                        "event_type": "invalid_move",
+                        "message": message
+                        }))
+        except KeyError:
             self.send(text_data=json.dumps({
-                "event_type": "invalid_move",
-                "message": str(e)
+                "message": f"Invalid data, you sent {text_data_json}",
+                "event_type": "fail"
                 }))
+
 
 
     # Receive message from room group

@@ -6,11 +6,12 @@ import { MoveEditor } from './components/MoveEditor'
 import PieceEditor from './components/PieceEditor';
 import { Lobby } from './components/Lobby';
 import Login from './components/Login'
-import { ExclamationCircleIcon } from '@heroicons/react/24/outline'
+import { ExclamationCircleIcon, BellAlertIcon } from '@heroicons/react/24/outline'
 import { chessStore, setMouseDownState } from './store';
 import { GameView } from './components/GameView';
 import axios from 'axios';
 import { API_URL } from './components/definitions';
+import { isYourMove } from './components/utils';
 
 
 // IF DJANGO STARTS giving OPTION calls instead of GET/POST and all the
@@ -26,9 +27,9 @@ export const api = axios.create({
     timeout: 1000,
     headers: {'X-CSRFToken': csrf_token}
 });
+
 //https://reactjs.org/docs/code-splitting.html#reactlazy
 api.interceptors.response.use((response) => {
-  console.info(response)
   return response
 },
   (error) => {
@@ -83,7 +84,11 @@ const App: FC = () => {
           text="Lobby to create games and join games made by other players."/></div>}><Lobby></Lobby></Tabs.Item>
         {
           games.map((game, idx) => {
-            return <Tabs.Item key={'game_' + idx} active={false} title={game.boardName}><GameView gameInfo={game}></GameView></Tabs.Item>
+            let title = <span>{game.boardName}</span>
+            if (isYourMove(game) && game.whiteUser != game.blackUser){
+              title = <span className='inline-flex'>{game.boardName}<BellAlertIcon className="h-5 w-5"/></span>
+            }
+            return <Tabs.Item key={'game_' + idx} active={false} title={title}><GameView gameInfo={game}></GameView></Tabs.Item>
           })
         }
         <Tabs.Item title={<div className='inline-flex'>Move Editor<HelpModal text="Create custom moves to add to your pieces!" /></div>}>

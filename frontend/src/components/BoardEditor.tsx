@@ -1,12 +1,11 @@
-import React, { FC, useState, useEffect } from 'react'
-import { BoardSetup, Move, Piece } from './types';
+import React, { FC, useState } from 'react'
+import { BoardSetup, Piece } from './types';
 import Select from 'react-select'
 import _ from 'lodash'
-import { api } from "../App"
 import PieceView from './PieceView';
 import { SaveElement, SaveState, initBoardSetup } from "./utils";
 import { Button, TextInput } from "flowbite-react"
-import { chessStore, updatePieces } from '../store';
+import { chessStore } from '../store';
 import { saveBoardToDB } from '../networking';
 
 const DELETE_PK = -10
@@ -77,7 +76,7 @@ export const BoardEditor: FC<BoardEditorProps> = ({ locToHandler, boardSetup}) =
           if (boardCell.isRoyal) {
               inner_element = <div className='relative'>
                 <img draggable="false" src={image_url} className="top-0 left-0"/>
-                <img draggable="false" src="media/crown.png" className="absolute top-0 left-0 h-4 w-4 rotate-12 mx-8 -my-1 rounded-md drop-shadow-md"/>
+                <img draggable="false" src="static/crown.png" className="absolute top-0 left-0 h-4 w-4 rotate-12 mx-8 -my-1 rounded-md drop-shadow-md"/>
               </div>
           } else {
             inner_element = <img draggable="false" src={image_url} />
@@ -112,15 +111,15 @@ const BoardEditorView: FC<BoardEditorViewProps> = () => {
     },
     {
       "name": "Color switch", 
-      "imageWhite": 'media/color-switch.png',
-      "imageBlack": 'media/color-switch.png',
+      "imageWhite": 'static/color-switch.png',
+      "imageBlack": 'static/color-switch.png',
       "moves": [ [ null, null, null, null, null, null, null, null, null, null, null, null, null, null, null ], [ null, null, null, null, null, null, null, null, null, null, null, null, null, null, null ], [ null, null, null, null, null, null, null, null, null, null, null, null, null, null, null ], [ null, null, null, null, null, null, null, null, null, null, null, null, null, null, null ], [ null, null, null, null, null, null, null, null, null, null, null, null, null, null, null ], [ null, null, null, null, null, null, null, null, null, null, null, null, null, null, null ], [ null, null, null, null, null, null, null, null, null, null, null, null, null, null, null ], [ null, null, null, null, null, null, null, null, null, null, null, null, null, null, null ], [ null, null, null, null, null, null, null, null, null, null, null, null, null, null, null ], [ null, null, null, null, null, null, null, null, null, null, null, null, null, null, null ], [ null, null, null, null, null, null, null, null, null, null, null, null, null, null, null ], [ null, null, null, null, null, null, null, null, null, null, null, null, null, null, null ], [ null, null, null, null, null, null, null, null, null, null, null, null, null, null, null ], [ null, null, null, null, null, null, null, null, null, null, null, null, null, null, null ], [ null, null, null, null, null, null, null, null, null, null, null, null, null, null, null ] ],
       "pk": SWAP_COLOR_PK
    },
    {
       "name": "Royalty switch", 
-      "imageWhite": 'media/crown.png', // Currently placing royal
-      "imageBlack": 'media/crown-dashed.png', // Currently placing non-royal. TODO: dotted crown
+      "imageWhite": 'static/crown.png', // Currently placing royal
+      "imageBlack": 'static/crown-dashed.png', // Currently placing non-royal. TODO: dotted crown
       "moves": [ [ null, null, null, null, null, null, null, null, null, null, null, null, null, null, null ], [ null, null, null, null, null, null, null, null, null, null, null, null, null, null, null ], [ null, null, null, null, null, null, null, null, null, null, null, null, null, null, null ], [ null, null, null, null, null, null, null, null, null, null, null, null, null, null, null ], [ null, null, null, null, null, null, null, null, null, null, null, null, null, null, null ], [ null, null, null, null, null, null, null, null, null, null, null, null, null, null, null ], [ null, null, null, null, null, null, null, null, null, null, null, null, null, null, null ], [ null, null, null, null, null, null, null, null, null, null, null, null, null, null, null ], [ null, null, null, null, null, null, null, null, null, null, null, null, null, null, null ], [ null, null, null, null, null, null, null, null, null, null, null, null, null, null, null ], [ null, null, null, null, null, null, null, null, null, null, null, null, null, null, null ], [ null, null, null, null, null, null, null, null, null, null, null, null, null, null, null ], [ null, null, null, null, null, null, null, null, null, null, null, null, null, null, null ], [ null, null, null, null, null, null, null, null, null, null, null, null, null, null, null ], [ null, null, null, null, null, null, null, null, null, null, null, null, null, null, null ] ],
       "pk": SWAP_ROYAL_PK
    },

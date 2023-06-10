@@ -1,7 +1,8 @@
 import React, {FC, useState} from "react";
 import _ from 'lodash'
-import { MoveGrid, BoardSetup } from './types'
+import { MoveGrid, BoardSetup, Game } from './types'
 import { DjangoMoveMap } from "../networking";
+import { chessStore } from '../store'
 export type SaveState ='saving'|'fail'|'ok' 
 
 interface SaveElementProps {
@@ -58,8 +59,28 @@ export const moveMapToGrid = (moveMap: DjangoMoveMap) => {
       return null
     });
   });
-  for(let pieceMove of Object.values(moveMap)) {
+  for(const pieceMove of Object.values(moveMap)) {
     moveGrid[pieceMove.relative_row + 7][pieceMove.relative_col + 7] = pieceMove.move
   }
   return moveGrid;
+}
+
+export function format_username(username: string) {
+  let username_comp = <span>{username}</span>
+  if (username.includes('@')) {
+    const [name_prefix, name_suffix] = username.split('@')
+    username_comp = <span>{name_prefix}<span className=" text-slate-300">@{name_suffix}</span></span>
+  }
+  return username_comp
+}
+
+export function isYourMove(gameInfo: Game) {
+  const username = chessStore.getState().username
+  let yourMove = false
+  if (gameInfo.whiteToMove && gameInfo.whiteUser == username) {
+    yourMove = true
+  } else if (!gameInfo.whiteToMove && gameInfo.blackUser == username) {
+    yourMove = true
+  }
+  return yourMove
 }

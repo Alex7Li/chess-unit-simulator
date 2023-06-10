@@ -119,7 +119,7 @@ const PieceEditor: FC<PieceEditorProps> = () => {
             eraserWidth={eraseWidth}
             canvasColor="white"
             strokeColor="black"
-            backgroundImage="media/tile_white.png"
+            backgroundImage="static/tile-white.png"
             exportWithBackgroundImage={false}
             ref={canvas}
           />

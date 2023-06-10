@@ -4,8 +4,12 @@ from PIL import Image
 import json
 import re
 import requests
-from typing import Dict, List, Tuple
+from random import randint
+from typing import Dict, List, Tuple, Literal
 
+from wonderwords import RandomWord
+
+from api.emoji import emoji
 from django.db import models
 from django.utils.translation import gettext_lazy as _
 from django.core.validators import MaxValueValidator, MinValueValidator
@@ -15,6 +19,7 @@ from django.core.files import File
 from django.db.utils import IntegrityError
 from func_timeout import FunctionTimedOut
 from rest_framework import serializers
+from core.settings import CODE_CONVERT_HOST, CODE_CONVERT_PORT
 
 import api.game_logic
 
@@ -34,11 +39,31 @@ def validate_color(color_string):
         raise ValidationError(f'Color is not valid, got "{color_string}" but want something of format "[0,17,255]"')
 
 def validate_simple_name(value):
-    if re.fullmatch("[a-zA-Z0-9_ ]", value):
+    if not re.fullmatch("[a-zA-Z0-9_ ]*", value):
         raise ValidationError(
             "Name must contain only english letters, numbers, spaces, and _",
             params={'value': value},
         )
+
+random_word_gen = RandomWord()
+def make_random_username(emoji_mode=False):
+    """Generate a random username
+    """
+    # about 910 adjectives
+    adjective = random_word_gen.word(include_parts_of_speech=["adjectives"])
+    # about 6800 nouns
+    noun = random_word_gen.word(include_parts_of_speech=["nouns"])
+    if emoji_mode:
+        # about 650 emojis (emojis usernames can't be validated lol)
+        prefix = emoji[randint(0, len(emoji) - 1)]
+        middle = emoji[randint(0, len(emoji) - 1)]
+        suffix = emoji[randint(0, len(emoji) - 1)]
+        username = f"{prefix}{adjective}{middle}{noun}{suffix}"
+    else:
+        valid_letters = "qwertyuiopasdfghjklzxcvbnmQWERTYUIOPASDFGHJKLZXCVBNM0123456789"
+        rand_suffix = ''.join([valid_letters[randint(0, len(valid_letters) - 1)] for _ in range(4)])
+        username = f"{adjective}_{noun}@{rand_suffix}"
+    return username
 
 class Move(models.Model):
     author = models.ForeignKey(User, on_delete=models.CASCADE)
@@ -46,7 +71,7 @@ class Move(models.Model):
         UI = 'UI'
         OFFICIAL = 'official'
         CUSTOM = 'custom'
-    cat = models.CharField(max_length=10, choices=Category.choices)
+    cat = models.CharField(max_length=10, choices=Category.choices, default=Category.CUSTOM)
     # color and boarder_color are RGB 3-tuples stored as a string
     color = models.CharField("rgb color string", max_length=20, validators=[
         validate_color
@@ -74,10 +99,17 @@ class MoveSerializer(serializers.ModelSerializer):
         model = Move
         fields = ['pk', 'cat', 'color', 'implementation', 'overview', 'description', 'symbol', 'author']
 
+class BinarySeralizer(serializers.Field):
+    def to_representation(self, value):
+        return "data:image/png;base64," + str(value, 'ascii') #remove b' and trailing '
+
 class Piece(models.Model):
-    image_white = models.ImageField(upload_to="pieces/")
-    image_black = models.ImageField(upload_to="pieces/")
+    image_white = models.BinaryField(blank=True)
+    image_black = models.BinaryField(blank=True)
     author = models.ForeignKey(User, on_delete=models.CASCADE, related_name='author')
+    class Meta:
+        indexes = [models.Index(fields=['author', 'cat'])]
+
     class Category(models.TextChoices):
         OFFICIAL = 'official'
         CUSTOM = 'custom'
@@ -94,25 +126,19 @@ class Piece(models.Model):
         # image is formated as 'data:image/png;base64,iVBOr==EGk'
         metadata, base64_data = image.split(',')
         content_type = re.search(r'(data:image\/)([a-z]*)(;base64)', metadata).group(2)
-        img_white_fpath = f"{name}_white.{content_type}"
-        img_black_fpath = f"{name}_black.{content_type}"
         piece = Piece(author=author, name=name, cat=cat)
         bytes_data = BytesIO(base64.b64decode(base64_data))
-        with Image.open(bytes_data) as base_img:
-            with Image.open('media/tile_white.png') as tile:
-                resize_tile = tile.resize(base_img.size)
-                comp = Image.alpha_composite(resize_tile, base_img)
-                with BytesIO() as output:
-                    comp.save(output, format=content_type)
-                    image_white = File(output)
-                    piece.image_white.save(img_white_fpath, image_white, True)
-        with Image.open('media/tile_black.png') as tile:
-                resize_tile = tile.resize(base_img.size)
-                comp = Image.alpha_composite(resize_tile, base_img)
-                with BytesIO() as output:
-                    comp.save(output, format=content_type)
-                    image_black = File(output)
-                    piece.image_black.save(img_black_fpath, image_black, True)
+        def make_image_bytes(bg_file):
+            with Image.open(bytes_data) as base_img:
+                with Image.open(bg_file) as tile:
+                    resize_tile = tile.resize(base_img.size)
+                    comp = Image.alpha_composite(resize_tile, base_img)
+                    with BytesIO() as output:
+                        comp.save(output, format=content_type)
+                        return base64.b64encode(output.getvalue())
+        byte_data = make_image_bytes('static/tile-white.png')
+        piece.image_white = byte_data
+        piece.image_black = make_image_bytes('static/tile-black.png')
         pieceMoves = []
         for moveInfo in moves:
             move = Move.objects.get(pk=moveInfo['move'])
@@ -161,8 +187,8 @@ class PieceMoveSerializer(serializers.ModelSerializer):
 class PieceSerializer(serializers.ModelSerializer):
     piece_moves = PieceMoveSerializer(many=True, read_only=True)
     author = serializers.SlugRelatedField('username', read_only=True)
-    image_white = serializers.ImageField(max_length=None, use_url=True, allow_null=True, required=False)
-    image_black = serializers.ImageField(max_length=None, use_url=True, allow_null=True, required=False)
+    image_white = BinarySeralizer()
+    image_black = BinarySeralizer()
 
     class Meta:
         model = Piece
@@ -175,7 +201,6 @@ class BoardSetup(models.Model):
     class Category(models.TextChoices):
         OFFICIAL = 'official'
         CUSTOM = 'custom'
-        GAME_IN_PROGRESS = 'game'
     cat = models.CharField(max_length=10, choices=Category.choices)
     class WinCon(models.TextChoices):
         KILL_ANY_ROYAL = 'anyR'
@@ -187,6 +212,10 @@ class BoardSetup(models.Model):
     def __str__(self):
         return f"Board Setup: {self.name} by {self.author}"
     
+    @property
+    def info_short(self):
+        return {'pk': self.pk, 'name': self.name}
+
     @staticmethod
     def create_board(author: User, name: str, pieces: List[Dict[str, int]],
                      cat: Category, wincon_white: WinCon, wincon_black: WinCon):
@@ -229,6 +258,7 @@ class BoardSetup(models.Model):
             if not white_has_royal:
                 raise ValidationError("White has no royal pieces")
         try:
+            print(repr(board))
             board.save()
             for pieceLoc in pieceLocations:
                 pieceLoc.save()
@@ -236,12 +266,19 @@ class BoardSetup(models.Model):
             for pieceLoc in pieceLocations:
                 pieceLoc.full_clean()
         except (ValidationError, IntegrityError) as e:
+            print('bad')
             try:
                 board.delete()
             except ValueError:
                 pass # was not saved
             raise ValidationError(e)
+        print('ok')
         return board
+
+    class Meta:
+        indexes = [
+           models.Index(fields=['cat', 'author']),
+       ]
 
 
 class PieceLocation(models.Model):
@@ -300,15 +337,38 @@ class Game(models.Model):
     white_user = models.ForeignKey(User, on_delete=models.CASCADE, related_name='white_user')
     black_user = models.ForeignKey(User, on_delete=models.CASCADE, related_name='black_user')
     white_to_move = models.BooleanField(default=True)
+    setup = models.ForeignKey(BoardSetup, on_delete=models.DO_NOTHING)
     game_state = models.JSONField()
+
+    class Meta:
+        indexes = [models.Index(fields=['white_user', 'black_user'])]
 
     class Result(models.TextChoices):
         WHITE_WIN = 'W'
+        WHITE_WIN_RESIGN = 'Y'
         BLACK_WIN = 'B'
+        BLACK_WIN_RESIGN = 'C'
         DRAW = 'D'
+        DRAW_AGREED = 'E'
         IN_PROGRESS = "P"
-    result = models.CharField(max_length=1, choices=Result.choices, default='P')
+    result = models.CharField(max_length=1, choices=Result.choices, default=Result.IN_PROGRESS)
+        
+    def resign(self, requesting_color: Literal['black', 'white']):
+        if requesting_color == "white":
+            self.result = self.Result.BLACK_WIN_RESIGN
+        elif requesting_color == "black":
+            self.result = self.Result.WHITE_WIN_RESIGN
+        self.save()
+        return True
 
+    def draw(self, requesting_color: Literal['black', 'white']):
+        if self.game_state['draw_offer'] == 'none':
+            self.game_state['draw_offer'] = requesting_color
+        elif self.game_state['draw_offer'] != requesting_color:
+            self.result = self.Result.DRAW_AGREED
+        self.save()
+        return True
+        
     @staticmethod
     def create_game(white_user: User, black_user: User, orig_board_setup: BoardSetup):
         initial_piece_locations = PieceLocation.objects.filter(('board_setup', orig_board_setup))
@@ -343,15 +403,17 @@ class Game(models.Model):
             'moves': moves,
             'wincon_white': orig_board_setup.wincon_white,
             'wincon_black': orig_board_setup.wincon_black,
-            'result': Game.Result.IN_PROGRESS
+            'draw_offer': 'none'
         }
 
-        game = Game(white_user=white_user, black_user=black_user, game_state=game_state_json)
+        game = Game(white_user=white_user, black_user=black_user,
+                    game_state=game_state_json,
+                    setup=orig_board_setup)
         game.full_clean()
         game.save()
         return game
 
-    def make_move(self, from_loc: Tuple[int, int], to_loc: Tuple[int, int]):
+    def make_move(self, from_loc: Tuple[int, int], to_loc: Tuple[int, int], user):
         board = {}
         for row in range(8):
             for col in range(8):
@@ -371,8 +433,16 @@ class Game(models.Model):
         piece = board[from_loc]['piece']
         if piece == None:
             raise ValidationError("Could not find a piece to move")
-        if (piece['team'] != 'white' and self.white_to_move) or (piece['team'] != 'black' and not self.white_to_move):
-            raise ValidationError(f"It's not currently {piece['team']}'s turn to move!")
+        if piece['team'] == 'white':
+            if not self.white_to_move:
+                raise ValidationError(f"It's not currently {piece['team']}'s turn to move")
+            if user != self.white_user:
+                raise ValidationError(f"You are not playing as white")
+        if piece['team'] == 'black':
+            if self.white_to_move:
+                raise ValidationError(f"It's not currently {piece['team']}'s turn to move")
+            if user != self.black_user:
+                raise ValidationError(f"You are not playing as black")
 
         rel_row = to_loc[0] - from_loc[0]
         rel_col = to_loc[1] - from_loc[1]
@@ -387,7 +457,7 @@ class Game(models.Model):
         # Get the implementation of the move from the XML representation
         headers = {'Content-type': 'application/json', 'Accept': 'text/plain'}
         data = json.dumps(move['implementation'])
-        response = requests.post("http://127.0.0.1:3333", data, headers=headers)
+        response = requests.post(f"http://{CODE_CONVERT_HOST}:{CODE_CONVERT_PORT}", data, headers=headers)
         if response.status_code != 200:
             raise ValidationError(f"Code conversion server has failed with error code {response.status_code}")
 
@@ -403,8 +473,6 @@ class Game(models.Model):
             raise ValidationError("You cannot play this move from this position.")
         except FunctionTimedOut:
             raise ValidationError("It took too long to execute this move (>1 sec), there may be an infinite loop. Try another move instead.")
-        except (SyntaxError, NameError) as e:
-            raise ValidationError(f"This move did not compile correctly, see the error trace:\n" + repr(e))
         if not result.did_action:
             raise ValidationError(f"You cannot play this move as it would do nothing.")
 
@@ -421,6 +489,9 @@ class Game(models.Model):
             new_board[f"{row},{col}"] = v
 
         self.game_state['board'] = new_board
+        if (((self.game_state['draw_offer'] == 'black') and self.white_to_move) or
+            ((self.game_state['draw_offer'] == 'white') and not self.white_to_move)):
+            self.game_state['draw_offer'] = 'none'
         self.white_to_move = not self.white_to_move
         self.save()
         return True
@@ -468,8 +539,8 @@ def get_game_result(start_pieces, end_pieces, wincon_white: BoardSetup.WinCon, w
 class GameSerializer(serializers.ModelSerializer):
     white_user = serializers.SlugRelatedField('username', read_only=True)
     black_user = serializers.SlugRelatedField('username', read_only=True)
+    setup = serializers.SlugRelatedField("info_short", read_only=True)
 
     class Meta:
         model = Game
-        fields = ['pk',  'white_user', 'black_user', 'white_to_move', 'game_state', 'result']
-
+        fields = ['pk',  'white_user', 'black_user', 'white_to_move', 'game_state', 'result', 'setup']

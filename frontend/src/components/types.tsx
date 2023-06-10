@@ -79,12 +79,14 @@ export type GameState = GameTile[][]
 
 export type Game = {
   websocket: WebSocket,
-  // Booleans detecting if you are playing as white or black. Note that
-  // both can be true for local multiplayer.
-  isPlayingWhite: boolean,
-  isPlayingBlack: boolean,
   gameState: GameState,
   boardName: string,
+  boardPk: number,
   pk: number,
+  whiteUser: string,
+  blackUser: string,
   result: GameResult
+  whiteToMove: boolean,
+  errorMessage: string,
+  drawOffer: string
 }

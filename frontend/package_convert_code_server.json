@@ -1,0 +1,18 @@
+{
+  "name": "convert_code_server",
+  "private": true,
+  "version": "0.0.0",
+  "license": "Apache 2.0",
+  "type": "module",
+  "scripts": {
+    "server": "npx tsx convert_code_server.ts"
+  },
+  "dependencies": {
+    "@types/node": "^16.18.11",
+    "blockly": "^9.2.1",
+    "express": "^4.18.2",
+    "npx": "^10.2.2",
+    "tsx": "^3.12.7",
+    "typescript": "^5.0.4"
+  }
+}

@@ -3,6 +3,8 @@ import { api } from '../App'
 import { Label, TextInput, Button } from 'flowbite-react';
 import { chessStore } from '../store';
 import { onLogin as fetchDataOnLogin, onLogin } from '../networking';
+import { format_username } from './utils'
+
 
 export default function Login() {
   const setUsername =  (username: string) => chessStore.setState(()=>{
@@ -41,6 +43,18 @@ export default function Login() {
         window.location.reload();
       })
     }
+  }
+  const signup_guest_func: React.MouseEventHandler<HTMLButtonElement> = (e) => {
+    api.post('/users', null, {
+      params: {
+        type: 'guest_signup'
+      }
+    }).then(() => {
+      setUsername(formUsername)
+      // TODO: here, login, logout
+      // refresh so that django login is registered
+      window.location.reload();
+    })
   }
   const login_func: React.MouseEventHandler<HTMLButtonElement> = (e) => {
     setIsSignup(false);
@@ -91,7 +105,7 @@ export default function Login() {
       </div>
       <TextInput
         id="name1"
-        placeholder="username"
+        placeholder="username, consists of letters, numbers, and ./+/_/- "
         required={true}
         value={formUsername}
         onChange={(e) => setFormUsername(e.target.value)}
@@ -107,6 +121,7 @@ export default function Login() {
       <TextInput
         id="password1"
         type="password"
+        placeholder="password"
         required={true}
         value={password}
         onChange={(e) => setPassword(e.target.value)}
@@ -114,8 +129,12 @@ export default function Login() {
     </div>
     <div className="flex p-2 m-2">
       When you login/out, the page will need to refresh.
-      <Button onClick={login_func}>Login</Button><Button onClick={signup_func}>Sign up</Button></div></div>;
-  const logout_comp = <div>Logged in as {username} <button onClick={logout_func}> Logout</button></div>
+      <Button onClick={login_func}>Login</Button>
+      <Button onClick={signup_func}>Sign up</Button>
+      <Button onClick={signup_guest_func}>Use guest account (data will not be saved)</Button>
+    </div></div>;
+  let username_comp = format_username(username)
+  const logout_comp = <div>Logged in as {username_comp} <button onClick={logout_func}> Logout</button></div>
   return (
     <div>
       {username ? logout_comp : login_comp}

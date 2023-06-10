@@ -18,8 +18,9 @@ Thus, this is our second backend. We put it in the frontend folder just for conv
 as this folder has the blockly generators and a javascript setup already.
 */
 
-import express, { Express, Request, Response } from 'express';
-import {Blockly, pythonGenerator} from '../frontend/src/blockly.js';
+
+import express, { Express, Request, Response } from './node_modules/express';
+import {Blockly, pythonGenerator} from './src/blockly';
 
 const app: Express = express()
 app.use(express.json());
@@ -33,9 +34,7 @@ function generate(json) {
 }
 
 app.get('/', (req: Request, res: Response) => {
-  let code = '{"blocks": {"languageVersion": 0, "blocks": [{"type": "chess_action", "id": "`8DRg_aD7uEOo{L?xIXd", "x": 137, "y": 52, "inputs": {"ACTION": {"block": {"type": "move", "id": "S5kX9!cc`[Weq+@;23GT", "inputs": {"FROM_UNIT": {"block": {"type": "acting_unit", "id": "8IZ.zuq_o3fB_EYrd|r5"}}, "TO_TILE": {"block": {"type": "targeted_tile", "id": "^!!!^cr){Mn?=xSH#6Ao"}}}}}}}]}}'
-  const workspace_json = JSON.parse(code)
-  res.send("<pre>" + generate(workspace_json) + "</pre>")
+  res.send("Convert code server up")
 })
 
 app.post('/', (req: Request, res: Response) => {

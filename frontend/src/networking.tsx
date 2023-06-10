@@ -1,20 +1,18 @@
 import _ from 'lodash'
 import axios from 'axios';
 
-import { initBoardSetup } from './components/utils'
+import { initBoardSetup, moveMapToGrid } from './components/utils'
 import { BoardSetup, Move, BoardSetupMeta, GameState } from './components/types'
 import { Game, LobbySetup } from './components/types';
 import { makeGameSocket } from './components/GameView';
 import { API_URL, GameResult } from './components/definitions';
-import { chessStore, updatePieces, updatePkToMove, updatePkToPiece } from "./store";
+import { chessStore, updatePieces, updateMoves, updatePkToMove, updatePkToPiece, setErrorMessage } from "./store";
 
 // We need to redeclare the api because this file is run
 // by the store for network queries before the app is initalized
 // and there is a referenceerror. Not sure if there is a nicer way to fix it.
 // @ts-ignore
 const csrf_token: String = document.querySelector('[name=csrfmiddlewaretoken]')!.value;
-
-console.log(csrf_token)
 
 const api = axios.create({
     baseURL: API_URL,
@@ -47,18 +45,39 @@ api.interceptors.response.use((response) => {
 // - it's good to decouple so that backend changes can be dealt with in one place
 // so they are not. It's harder than you would expect to share the same types
 // in the frontend and backend!
-type DjangoGamePiece = {
-  piece_pk: number
-  team: string
+export type DjangoGamePiece = {
   is_royal: boolean
+  name: string
+  piece_id: number
+  piece_pk: number
+  piece_moves: PieceMove[]
+  team: string
 }
 type DjangoGameStateTile = {
-  piece: DjangoGamePiece
+  piece: DjangoGamePiece | null
 }
 type DjangoGameState = {
   board: {[key: string]: DjangoGameStateTile}
   moves: Move[]
+  wincon_black: string
+  wincon_white: string
+  draw_offer: string
 }
+
+type DjangoSetupShort = {
+  pk: number,
+  name: string,
+}
+export type DjangoGameData = {
+  game_state: DjangoGameState
+  pk: number
+  white_user: string
+  black_user: string
+  setup: DjangoSetupShort
+  white_to_move: boolean
+  result: GameResult
+}
+
 type DjangoPieceOnBoard = {
   row: number;
   col: number;
@@ -108,10 +127,7 @@ export const fetchMoves = async () => {
     const response = await api.get('/moves', {
       params: {}
     })
-    chessStore.setState((state) => {
-      state.updateMoves(response.data);
-      return {}
-    });
+    updateMoves(response.data);
 }
 
 const boardSetupToMap = (grid: BoardSetup) => {
@@ -169,9 +185,9 @@ export const saveBoardToDB = async (boardSetup: BoardSetup, boardName: string, w
 }
 
 
-export const getBoardSetups = async () => {
+export const getBoardSetups = async (params={}) => {
     return api.get('/boardSetups', {
-      params: {}
+      params: params
     }).then((response) => {
       const data = response.data;
       data['pieces'] = _.mapValues(data['pieces'], (piece) => {piece.piecePk = piece.piece; delete piece.piece; return piece;})
@@ -182,7 +198,7 @@ export const getBoardSetups = async () => {
 
 
 // Django sends data formatted like a board setup, convert it to GameState
-export const gameStateFromDjango = (init_state: DjangoGameState) => {
+const gameStateFromDjango = (init_state: DjangoGameState) => {
   const grid: GameState = Array.from({ length: 8 }).map((_, row: number) => {
     return Array.from({ length: 8 }).map((_, col: number) => {
       return {'row': row, 'col': col, 'piece': null}
@@ -190,18 +206,54 @@ export const gameStateFromDjango = (init_state: DjangoGameState) => {
   });
   const pkToPiece = chessStore.getState().pkToPiece
   for(let [key, value] of Object.entries(init_state.board)) {
-      let [row, col] = key.split(',')
-      if (value.piece != null) {
-        const piece = {
-          'team': value.piece.team,
-          'isRoyal': value.piece.is_royal,
-          ...pkToPiece.get(value.piece.piece_pk)!,
-        }
-        grid[parseInt(row)][parseInt(col)]['piece'] = piece
+    let [row, col] = key.split(',')
+    const p = value.piece
+    if (p != null) {
+      const orig_piece = pkToPiece.get(p.piece_pk)!
+      const piece = {
+        team: p.team,
+        isRoyal: p.is_royal,
+        moves: moveMapToGrid(p.piece_moves),
+        name: p.name,
+        pk: p.piece_pk,
+        // Reference orig_piece only for data unrelated
+        // to the game - if the piece is modified, and
+        // then the game is refreshed, it may change,
+        // and we want to mitigate the damage!
+        author: orig_piece?.author,
+        imageBlack: orig_piece?.imageBlack,
+        imageWhite: orig_piece?.imageWhite
       }
+      grid[parseInt(row)][parseInt(col)]['piece'] = piece
+    }
   }
   return grid
 }
+
+export const updateGame = (gameData: DjangoGameData) => chessStore.setState((state) => {
+  const newGameState = gameStateFromDjango(gameData['game_state'])
+  const gamePk = gameData.pk
+  let newGames: Array<Game> = _.map(state.games, (game) => {
+    if (game.pk == gamePk) {
+      return {
+        websocket: game.websocket,
+        whiteUser: gameData.white_user,
+        blackUser: gameData.black_user,
+        whiteToMove: gameData.white_to_move,
+        gameState: newGameState,
+        boardName: game.boardName,
+        boardPk: game.boardPk,
+        pk: gameData.pk,
+        result: gameData.result,
+        errorMessage: "",
+        drawOffer: gameData.game_state.draw_offer
+      }
+    } else {
+      return game
+    }
+  })
+  return {games: newGames}
+})
 
 /**************************************************
  ****************      Lobby     ******************
@@ -257,28 +309,36 @@ export const createLobbySocket = () => {
   return setupLobbySocket(lobbySocket)
 }
 
+const startGame = (game_data: DjangoGameData) => {
+  chessStore.setState((state) => {
+    const game_pk = game_data['pk']
+    const newGame: Game = {
+      websocket: makeGameSocket(game_pk),
+      whiteUser: game_data['white_user'],
+      blackUser: game_data['black_user'],
+      whiteToMove: game_data['white_to_move'],
+      boardName: game_data['setup']['name'],
+      boardPk: game_data['setup']['pk'],
+      gameState: gameStateFromDjango(game_data['game_state']),
+      pk: game_pk,
+      result: game_data['result'],
+      errorMessage: "",
+      drawOffer: game_data['game_state']['draw_offer']
+    }
+    return {games: [...state.games, newGame]}
+    }
+  )
+}
+
 export const setupLobbySocket = (lobbySocket: WebSocket) => {
   lobbySocket.onmessage = function (m) { const data = JSON.parse(m.data);
     if (data['event_type'] == 'begin_game') {
       // Were we one of the players?
-      const game_data = data['game_data']
+      const game_data: DjangoGameData = data['game_data']
       const is_white = data['whoami'] == game_data['white_user']
       const is_black = data['whoami'] == game_data['black_user']
       if (is_white || is_black) {
-        chessStore.setState((state) => {
-          const game_pk = game_data['pk']
-          const newGame: Game = {
-            websocket: makeGameSocket(game_pk),
-            isPlayingWhite: is_white,
-            isPlayingBlack: is_black,
-            boardName: data['game_name'],
-            gameState: gameStateFromDjango(game_data['game_state']),
-            pk: game_pk,
-            result: GameResult.IN_PROGRESS,
-          }
-          return {games: [...state.games, newGame]}
-          }
-        )
+        startGame(game_data)
       }
       removeFromLobby(data['deleted_ids'])
     } else if (data['event_type'] == 'delete_game') {
@@ -292,6 +352,7 @@ export const setupLobbySocket = (lobbySocket: WebSocket) => {
   };
 
   lobbySocket.onclose = function (m) {
+    setErrorMessage("Lobby socket closed unexpectedly, you need to restart to join a new game.")
     console.log('Lobby socket closed with message: ');
     console.log(m)
   };
@@ -330,12 +391,39 @@ export const onLogin = (username: string) => {
     }
     const lobby = new WebSocket( 'ws://' + window.location.host + '/ws/lobby/')
     return {lobby: setupLobbySocket(lobby)}
-  })
+  });
   
   // Get games in the lobby
-  api.get('/games').then((response) => {
+  api.get('/gameRequests').then((response) => {
     const data = response.data;
     updatePkToPiece(data['pieces'])
     addToLobby(data['game_requests'], false)
+  });
+
+  // Get games that we are currently playing
+  api.get('/games').then((response) => {
+    const games: DjangoGameData[] = response.data['games']
+    // First, fetch piece images that are the board setups
+    let setup_pk_list = []
+    for(const game of games) {
+      setup_pk_list.push(game['setup']['pk'])
+    }
+    setup_pk_list =  _.uniq(setup_pk_list)
+    getBoardSetups({'pk_list': setup_pk_list.join(",")}).then(() => {
+        // Now, display all of the games
+        const inProgGames = chessStore.getState().games
+        for(const game of games) {
+          let is_in_db = false
+          for(const curGame of inProgGames){
+            if (curGame.pk == game.pk) {
+              is_in_db = true
+            }
+          }
+          if (!is_in_db) {
+            startGame(game)
+          }
+        }
+      }
+    )
   });
 }

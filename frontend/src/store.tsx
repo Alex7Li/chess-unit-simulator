@@ -1,11 +1,10 @@
 // Mm, let's buy things from this store!
 // No, no. It's a database.
 import _ from 'lodash'
-import { DjangoPiece,  createLobbySocket} from './networking'
+import { DjangoPiece,  DjangoGameData } from './networking'
 import { create } from 'zustand'
 import { BoardSetupMeta, Move, Piece, Game, LobbySetup, GameState } from './components/types'
 import { moveMapToGrid } from './components/utils'
-import { GameResult } from './components/definitions'
 
 const moveOrder = (a: Move) => {
   switch (a.cat) {
@@ -33,10 +32,11 @@ interface ChessStoreInterface {
   // piece map from a primary key, may contain more pieces
   // than just userPieces
   pkToPiece: Map<number, Piece>;
+  // all of the moves in a given game
+  gamePkToMove: Map<number, Map<number, Move>>;
   lobby: null | WebSocket;
   lobbySetups: Array<LobbySetup>;
   games: Array<Game>;
-  updateMoves: (newMoves: Array<Move>) => void;
 
   // Misc
   username: string;
@@ -53,8 +53,15 @@ export const chessStore = create<ChessStoreInterface>()((set) => ({
   lobby: null, 
   pkToMove: new Map(),
   pkToPiece: new Map(),
+  gamePkToMove: new Map(),
   games: [],
-  updateMoves: (newMoves) => set((state) => {
+  // Misc database
+  username: '',
+  mouseDownState: 0,
+  errorMessage: "",
+}));
+
+export const updateMoves = (newMoves: Array<Move>) => chessStore.setState((state) => {
     let mergedMoves = _.uniqBy([...newMoves, ...state.userMoves], (move) => move.pk);
     mergedMoves.sort((a, b) => moveOrder(a) - moveOrder(b));
     const pkToMove = new Map<number, Move>(state.pkToMove);
@@ -62,13 +69,7 @@ export const chessStore = create<ChessStoreInterface>()((set) => ({
       pkToMove.set(v.pk, v);
     }
     return {userMoves: mergedMoves, pkToMove: pkToMove}
-  }),
-  // Misc database
-  username: '',
-  mouseDownState: 0,
-  errorMessage: "",
-}));
-
+});
 
 export const setErrorMessage = (message: string) => chessStore.setState(() => {
   return {
@@ -94,7 +95,7 @@ export const updatePieces = (pieceData: Array<DjangoPiece>) => chessStore.setSta
       }
     });
     const mergedPieces = _.uniqBy([...newPieces, ...state.userPieces], (piece) => piece.pk)
-    const newPkMap= new Map<number, Piece>(state.pkToPiece); //Lookup key by move name
+    const newPkMap= new Map<number, Piece>(state.pkToPiece); // Lookup key by move name
     _.forEach(mergedPieces, function (p: Piece) {
       newPkMap.set(p.pk, p);
     });
@@ -127,23 +128,25 @@ export const updatePkToPiece = (newPkToPiece: {[key: number]: DjangoPiece}) => c
   return {pkToPiece: ret}
 })
 
-export const updateGame = (game_pk: number, newGameState: GameState, result: GameResult) => chessStore.setState((state) => {
-  let new_games: Array<Game> = _.map(state.games, (game) => {
-    if (game.pk == game_pk) {
-      return {
-        websocket: game.websocket,
-        isPlayingWhite: game.isPlayingWhite,
-        isPlayingBlack: game.isPlayingBlack,
-        gameState: newGameState,
-        boardName: game.boardName,
-        pk: game.pk,
-        result: result
-      }
+export const updateGamePkToMove = (newPkToMove: {[key: number]: Move}, game_id: number) => chessStore.setState((state) => {
+  const ret = new Map<number, Move>(state.gamePkToMove.get(game_id));
+  for(let [k, v] of Object.entries(newPkToMove)) {
+    ret.set(parseInt(k), v);
+  }
+  const newGamePkToMove = _.clone(state.gamePkToMove)
+  newGamePkToMove.set(game_id, ret)
+  return {gamePkToMove: newGamePkToMove}
+})
+
+export const updateGameMessage = (gamePk: number, message: string) => chessStore.setState((state) => {
+  let newGames: Array<Game> = _.map(state.games, (game) => {
+    if (game.pk == gamePk) {
+      return { ...game, errorMessage: message}
     } else {
       return game
     }
   })
-  return {games: new_games}
+  return  {games: newGames}
 })
 
 export const exitGame = (game_pk: number) => chessStore.setState((state) => {

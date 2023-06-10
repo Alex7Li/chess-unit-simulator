@@ -7,10 +7,14 @@ export const CANCEL_MOVE_PK = -1
 
 const default_lightness = 72;
 
+// Same as api/models.py Game.Result
 export enum GameResult {
   WHITE_WIN = 'W',
+  WHITE_WIN_RESIGN = 'Y',
   BLACK_WIN = 'B',
+  BLACK_WIN_RESIGN = 'C',
   DRAW = 'D',
+  DRAW_AGREED = 'E',
   IN_PROGRESS = "P"
 }
 
@@ -24,8 +28,8 @@ export const PIECES: Array<Piece> = [
   },
   {
     "name": "Color switch", 
-    "imageWhite": 'media/color-switch.png',
-    "imageBlack": 'media/color-switch.png',
+    "imageWhite": 'static/color-switch.png',
+    "imageBlack": 'static/color-switch.png',
     "moves": [ [ null, null, null, null, null, null, null, null, null, null, null, null, null, null, null ], [ null, null, null, null, null, null, null, null, null, null, null, null, null, null, null ], [ null, null, null, null, null, null, null, null, null, null, null, null, null, null, null ], [ null, null, null, null, null, null, null, null, null, null, null, null, null, null, null ], [ null, null, null, null, null, null, null, null, null, null, null, null, null, null, null ], [ null, null, null, null, null, null, null, null, null, null, null, null, null, null, null ], [ null, null, null, null, null, null, null, null, null, null, null, null, null, null, null ], [ null, null, null, null, null, null, null, null, null, null, null, null, null, null, null ], [ null, null, null, null, null, null, null, null, null, null, null, null, null, null, null ], [ null, null, null, null, null, null, null, null, null, null, null, null, null, null, null ], [ null, null, null, null, null, null, null, null, null, null, null, null, null, null, null ], [ null, null, null, null, null, null, null, null, null, null, null, null, null, null, null ], [ null, null, null, null, null, null, null, null, null, null, null, null, null, null, null ], [ null, null, null, null, null, null, null, null, null, null, null, null, null, null, null ], [ null, null, null, null, null, null, null, null, null, null, null, null, null, null, null ] ],
     "pk": -1
  }
