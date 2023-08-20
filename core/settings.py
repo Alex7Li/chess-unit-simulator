@@ -12,42 +12,65 @@ https://docs.djangoproject.com/en/4.1/ref/settings/
 
 from pathlib import Path
 import os
+import sys
 from dotenv import load_dotenv
+import dj_database_url
 load_dotenv()
+BACKEND_HOST = os.environ.get('BACKEND_HOST', 'localhost')
+BACKEND_PORT = os.environ.get('BACKEND_PORT', '8000')
 REDIS_HOST = os.environ.get('REDIS_HOST', '127.0.0.1')
 REDIS_PORT = os.environ.get('REDIS_PORT', '6379')
 CODE_CONVERT_HOST = os.environ.get('CODE_CONVERT_HOST', '127.0.0.1')
 CODE_CONVERT_PORT = os.environ.get('CODE_CONVERT_PORT', '3333')
-POSTGRES_HOST = os.environ.get('POSTGRES_HOST', 'chess-store.cg9ekdldutjz.us-east-2.rds.amazonaws.com')
-POSTGRES_USERNAME = os.environ.get('POSTGRES_USERNAME', 'postgres')
-POSTGRES_PASSWORD = os.environ.get('POSTGRES_PASSWORD', 'oops')
+POSTGRES_HOST = os.environ.get('POSTGRES_HOST', 'lumpy-wyvern-4982.g8z.cockroachlabs.cloud')
+POSTGRES_PORT = os.environ.get('POSTGRES_PORT', '26257')
+POSTGRES_USERNAME = os.environ.get('POSTGRES_USERNAME', 'alex')
+POSTGRES_PASSWORD = os.environ.get('POSTGRES_PASSWORD', 'oops_i_exposed_the_password')
+POSTGRES_URL = f"postgresql://{POSTGRES_USERNAME}:{POSTGRES_PASSWORD}@{POSTGRES_HOST}:{POSTGRES_PORT}/defaultdb?sslmode=verify-full"
 
 # Build paths inside the project like this: BASE_DIR / 'subdir'.
+# /home/alex/git/chess-unit-simulator
 BASE_DIR = Path(__file__).resolve().parent.parent
 
 
-# Quick-start development settings - unsuitable for production
-# See https://docs.djangoproject.com/en/4.1/howto/deployment/checklist/
+DEBUG = True
+USE_TEST_DB = True
 
-with open('core/secret_key.txt') as f:
+# Required for {% if debug %} in templates apparently?
+INTERNAL_IPS = (
+    '127.0.0.1',
+    # '192.168.1.23',
+)
+
+with open(BASE_DIR / 'core/secret_key.txt') as f:
     SECRET_KEY = f.read().strip()
-
-# SECURITY WARNING: don't run with debug turned on in production!
-DEBUG = False
+# else:
+#     SECRET_KEY = 'debug_key'
 # For better error message
 DEBUG_PROPAGATE_EXCEPTIONS = True
+CSRF_COOKIE_SECURE = True
+SESSION_COOKIE_SECURE = True
 
 ALLOWED_HOSTS = [
     "127.0.0.1",
-    "redis",
-    "chess-store.cg9ekdldutjz.us-east-2.rds.amazonaws.com"
+    "localhost",
+    REDIS_HOST,
+    POSTGRES_HOST,
 ]
 
+CORS_ALLOWED_ORIGINS = [
+    # 'http://localhost:5173',
+    # 'http://127.0.0.1:5173',
+    f'http://{REDIS_HOST}:{REDIS_PORT}',
+    f'http://{POSTGRES_HOST}:{POSTGRES_PORT}',
+    f'http://{CODE_CONVERT_HOST}:{CODE_CONVERT_PORT}',
+    f'http://{BACKEND_HOST}:{BACKEND_PORT}',
+]
 
 # Application definition
-
 INSTALLED_APPS = [
     'daphne',
+    "corsheaders",
     'rest_framework',
     'api.apps.ApiConfig',
     'django.contrib.staticfiles',
@@ -56,6 +79,7 @@ INSTALLED_APPS = [
     'django.contrib.contenttypes',
     'django.contrib.sessions',
     'django.contrib.messages',
+    # https://learndjango.com/tutorials/django-signup-tutorial
 ]
 
 MIDDLEWARE = [
@@ -75,7 +99,7 @@ ROOT_URLCONF = 'core.urls'
 TEMPLATES = [
     {
         'BACKEND': 'django.template.backends.django.DjangoTemplates',
-        'DIRS': [BASE_DIR / '../frontend/'],
+        'DIRS': [BASE_DIR / 'frontend', BASE_DIR / "api" / "templates"],
         'APP_DIRS': True,
         'OPTIONS': {
             'context_processors': [
@@ -87,6 +111,9 @@ TEMPLATES = [
         },
     },
 ]
+LOGIN_REDIRECT_URL = "/chess"
+LOGOUT_REDIRECT_URL = "/accounts/login"
+
 
 WSGI_APPLICATION = 'core.wsgi.application'
 ASGI_APPLICATION = "core.asgi.application"
@@ -102,17 +129,20 @@ CHANNEL_LAYERS = {
 
 # Database
 # https://docs.djangoproject.com/en/4.1/ref/settings/#databases
-
-DATABASES = {
-    'default': {
-        'ENGINE': 'django.db.backends.postgresql',
-        'NAME': 'postgres',
-        'USER': POSTGRES_USERNAME,
-        'PASSWORD': POSTGRES_PASSWORD,
-        'HOST': POSTGRES_HOST,
-        'PORT': '5432',
+if 'test' in sys.argv or USE_TEST_DB:
+    DATABASES = {
+        'default': {
+            'ENGINE': 'django.db.backends.sqlite3',
+            'NAME': 'db.sqlite',
+            'TEST': {
+                'NAME': 'mytestdatabase',
+            },
+        }
     }
-}
+else:
+    DATABASES = {
+        'default': dj_database_url.config(default=POSTGRES_URL, engine='django_cockroachdb'),
+    }
 
 
 # Password validation
@@ -150,11 +180,12 @@ VITE_APP_DIR = BASE_DIR / "frontend"
 # Static files (CSS, JavaScript, Images)
 # https://docs.djangoproject.com/en/4.1/howto/static-files/
 
-STATIC_URL = '/static/'
+STATIC_URL = 'static/'
 STATICFILES_DIRS = [
     VITE_APP_DIR / "dist",
+    VITE_APP_DIR / "assets",
 ]
-STATIC_ROOT = os.path.join(BASE_DIR, 'static')
+STATIC_ROOT = BASE_DIR / 'static'
 
 # Default primary key field type
 # https://docs.djangoproject.com/en/4.1/ref/settings/#default-auto-field
@@ -164,6 +195,3 @@ DEFAULT_AUTO_FIELD = 'django.db.models.BigAutoField'
 # MEDIA_URL = '/media/'
 # MEDIA_ROOT = BASE_DIR / 'core' / 'static'
 # print(f"MEDIA URL {MEDIA_URL} root {MEDIA_ROOT}")
-CORS_ALLOWED_ORIGINS = [
-    "http://localhost:5173",
-]

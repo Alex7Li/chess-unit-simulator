@@ -40,11 +40,16 @@ python manage.py shell
 ![frontend demo](/frontend_demo.gif)
 (demo is perpetually outdated)
 
-Run production:
+### Run production
 
 ```bash
 frontend$ yarn build
 $ python manage.py collectstatic
-$ docker-compose build
+$ docker-compose build # make sure to start docker first
 $ docker-compose up
 ```
+
+### Deploy (Todo)
+
+https://cloud.google.com/kubernetes-engine/docs/tutorials/hello-app#building_the_container_image
+

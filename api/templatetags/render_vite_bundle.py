@@ -17,7 +17,6 @@ def render_vite_bundle():
     Supposed to only be used in production.
     For development, see other files.
     """
-  
     try:
         fd = open(f"{settings.VITE_APP_DIR}/dist/manifest.json", "r")
         manifest = json.load(fd)

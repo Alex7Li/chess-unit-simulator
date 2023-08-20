@@ -1,9 +1,12 @@
 // Don't add any more imports in this file so the convert_code_server doesn't break
 import Blockly from 'blockly/core';
+import * as BLOCKLY_ENGLISH from 'blockly/msg/en';
+
 // Imported in a weird way because the convert_code_server was getting angsty
 import pkg from 'blockly/python';
 const {pythonGenerator: pyGen} = pkg;
 
+Blockly.setLocale(BLOCKLY_ENGLISH);
 const chessTheme = Blockly.Theme.defineTheme('chessTheme', {
   'base': Blockly.Themes.Classic,
   'name': "chessTheme",

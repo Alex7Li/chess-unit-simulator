@@ -8,9 +8,9 @@ import { Button, TextInput } from "flowbite-react"
 import { chessStore } from '../store';
 import { saveBoardToDB } from '../networking';
 
-const DELETE_PK = -10
-const SWAP_COLOR_PK = -8
-const SWAP_ROYAL_PK = -5
+const DELETE_PK = "DEL"
+const SWAP_COLOR_PK = "SWP_COLOR"
+const SWAP_ROYAL_PK = "SWP_ROYAL"
 
 interface BoardEditorProps {
   boardSetup: BoardSetup;
@@ -19,7 +19,7 @@ interface BoardEditorProps {
 interface PiecesViewProps {
   selectedPiece: Piece | null,
   setSelectedPiece: React.Dispatch<React.SetStateAction<Piece | null>>,
-  pieces: Array<Piece>
+  pieces: Array<Piece> 
   swapColors: () => void
   swapRoyal: () => void
   placingWhite: boolean

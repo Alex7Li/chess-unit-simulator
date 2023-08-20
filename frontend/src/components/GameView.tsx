@@ -1,19 +1,18 @@
 import React, { FC, useRef, useState, useEffect } from "react";
 import _ from 'lodash'
 import { chessStore, exitGame, updateGamePkToMove, updateGameMessage, setErrorMessage } from "../store";
-import { Game, GameState, GameTile, GamePiece } from "./types";
+import { Game, GameState, GameTile, GamePiece, DjangoGameData } from "./types";
 import PieceView from "./PieceView";
 import MoveIcon from "./MoveIcon";
-import { updateGame, DjangoGameData } from "../networking";
+import { updateGame } from "../networking";
 import { GameResult } from "./definitions";
 import { Button } from "flowbite-react";
 import { format_username, isYourMove } from './utils'
 
-// Related file: api/consumers
-export const makeGameSocket = (gamePk: number) => {
+export const makeGameSocket = (gamePk: string) => {
   const gameSocket = new WebSocket(
     'ws://' + window.location.host
-    + '/ws/game/' + gamePk.toString() + '/'
+    + '/ws/game/' + gamePk + '/'
   );
 
   gameSocket.onmessage = function (m) {
@@ -146,7 +145,7 @@ export const GameView: FC<GameProps> = ({gameInfo}) => {
                 d_row *= -1
             }
             d_row += 7
-            const move: number | null | undefined = selTile.piece.moves[d_row][col - selTile.col + 7]
+            const move: string | null | undefined = selTile.piece.moves[d_row][col - selTile.col + 7]
             // If the current piece cannot move to the target square
             if (move == null) {
               setSelectedTile({

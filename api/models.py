@@ -15,13 +15,21 @@ from django.utils.translation import gettext_lazy as _
 from django.core.validators import MaxValueValidator, MinValueValidator
 from django.core.exceptions import ValidationError
 from django.contrib.auth.models import User
-from django.core.files import File
 from django.db.utils import IntegrityError
 from func_timeout import FunctionTimedOut
 from rest_framework import serializers
 from core.settings import CODE_CONVERT_HOST, CODE_CONVERT_PORT
 
 import api.game_logic
+class BaseModelSerializer(serializers.ModelSerializer):
+    def to_representation(self, obj):
+        data = super().to_representation(obj)
+        # pks must be serialized as strings because the db doesn't start at 1 and rounding error happens 
+        # when you cast it to json
+        if 'pk' in data:
+            data['pk'] = str(data['pk'])
+        return data
+
 
 def to_color_string(color_array):
     return '[' + ','.join(map(str, color_array)) + ']'
@@ -87,7 +95,7 @@ class Move(models.Model):
     class Meta:
         indexes = [models.Index(fields=['author'])]
 
-class MoveSerializer(serializers.ModelSerializer):
+class MoveSerializer(BaseModelSerializer):
     author = serializers.SlugRelatedField('username', read_only=True)
 
     def to_representation(self, obj):
@@ -123,7 +131,7 @@ class Piece(models.Model):
     def create_piece(image: str, author: User,
                      name: str, moves: List[Dict[str, int]],
                      cat: Category):
-        # image is formated as 'data:image/png;base64,iVBOr==EGk'
+        # image is formated as 'data:image/png;base64,iVBOr== EGk'
         metadata, base64_data = image.split(',')
         content_type = re.search(r'(data:image\/)([a-z]*)(;base64)', metadata).group(2)
         piece = Piece(author=author, name=name, cat=cat)
@@ -141,7 +149,7 @@ class Piece(models.Model):
         piece.image_black = make_image_bytes('static/tile-black.png')
         pieceMoves = []
         for moveInfo in moves:
-            move = Move.objects.get(pk=moveInfo['move'])
+            move = Move.objects.get(pk=int(moveInfo['move']))
             pieceMoves.append(PieceMove(
                 relative_row=moveInfo['relative_row'],
                 relative_col=moveInfo['relative_col'],
@@ -179,12 +187,17 @@ class PieceMove(models.Model):
     class Meta:
         indexes = [models.Index(fields=['piece'])]
 
-class PieceMoveSerializer(serializers.ModelSerializer):
+class PieceMoveSerializer(BaseModelSerializer):
+    def to_representation(self, obj):
+        data = super().to_representation(obj)
+        data['move'] = str(data['move'])
+        return data
+
     class Meta:
         model = PieceMove
         fields = ['relative_row', 'relative_col', 'move']
 
-class PieceSerializer(serializers.ModelSerializer):
+class PieceSerializer(BaseModelSerializer):
     piece_moves = PieceMoveSerializer(many=True, read_only=True)
     author = serializers.SlugRelatedField('username', read_only=True)
     image_white = BinarySeralizer()
@@ -210,11 +223,11 @@ class BoardSetup(models.Model):
     wincon_black = models.CharField(max_length=4, choices=WinCon.choices, default=WinCon.KILL_ALL)
 
     def __str__(self):
-        return f"Board Setup: {self.name} by {self.author}"
+        return f"Board Setup {self.pk}: {self.name} by {self.author}"
     
     @property
     def info_short(self):
-        return {'pk': self.pk, 'name': self.name}
+        return {'pk': str(self.pk), 'name': self.name}
 
     @staticmethod
     def create_board(author: User, name: str, pieces: List[Dict[str, int]],
@@ -228,7 +241,7 @@ class BoardSetup(models.Model):
         white_has_royal = False
         black_has_royal = False
         for pieceLocation in pieces:
-            piece = Piece.objects.get(pk=pieceLocation['piece'])
+            piece = Piece.objects.get(pk=int(pieceLocation['piece']))
             if pieceLocation['team'] == 'white':
                 team = PieceLocation.Team.WHITE
                 white_has_piece = True
@@ -258,7 +271,6 @@ class BoardSetup(models.Model):
             if not white_has_royal:
                 raise ValidationError("White has no royal pieces")
         try:
-            print(repr(board))
             board.save()
             for pieceLoc in pieceLocations:
                 pieceLoc.save()
@@ -266,20 +278,17 @@ class BoardSetup(models.Model):
             for pieceLoc in pieceLocations:
                 pieceLoc.full_clean()
         except (ValidationError, IntegrityError) as e:
-            print('bad')
             try:
                 board.delete()
             except ValueError:
                 pass # was not saved
             raise ValidationError(e)
-        print('ok')
         return board
 
     class Meta:
         indexes = [
            models.Index(fields=['cat', 'author']),
        ]
-
 
 class PieceLocation(models.Model):
     row = models.SmallIntegerField(validators=[
@@ -305,15 +314,19 @@ class PieceLocation(models.Model):
            models.Index(fields=['board_setup']),
        ]
 
-class PieceLocationSerializer(serializers.ModelSerializer):
+class PieceLocationSerializer(BaseModelSerializer):
+
+    def to_representation(self, obj):
+        data = super().to_representation(obj)
+        data['piece'] = str(data['piece'])
+        return data
     class Meta:
         model = PieceLocation
         fields = ['row', 'col', 'piece', 'team', 'is_royal']
 
-class BoardSetupSerializer(serializers.ModelSerializer):
+class BoardSetupSerializer(BaseModelSerializer):
     piece_locations = PieceLocationSerializer(many=True, read_only=True)
     author = serializers.SlugRelatedField('username', read_only=True)
-
     class Meta:
         model = BoardSetup
         fields = ['pk',  'author', 'cat', 'name', 'piece_locations']
@@ -322,7 +335,7 @@ class GameRequest(models.Model):
     requesting_user = models.ForeignKey(User, on_delete=models.CASCADE)
     board_setup = models.ForeignKey(BoardSetup, on_delete=models.CASCADE)
 
-class GameRequestSerializer(serializers.ModelSerializer):
+class GameRequestSerializer(BaseModelSerializer):
     requesting_user = serializers.SlugRelatedField('username', read_only=True)
     board_setup = BoardSetupSerializer(read_only=True)
     class Meta:
@@ -388,7 +401,7 @@ class Game(models.Model):
                     'team': pieceLoc.team,
                     'name': piece['name'],
                     'piece_id': pieceId,
-                    'piece_pk': piece['pk'],
+                    'piece_pk': str(piece['pk']),
                     'piece_moves': piece['piece_moves'],
                     'is_royal': pieceLoc.is_royal
                 }
@@ -536,7 +549,7 @@ def get_game_result(start_pieces, end_pieces, wincon_white: BoardSetup.WinCon, w
     elif not results[0] and results[1]:
         return Game.Result.DRAW
 
-class GameSerializer(serializers.ModelSerializer):
+class GameSerializer(BaseModelSerializer):
     white_user = serializers.SlugRelatedField('username', read_only=True)
     black_user = serializers.SlugRelatedField('username', read_only=True)
     setup = serializers.SlugRelatedField("info_short", read_only=True)

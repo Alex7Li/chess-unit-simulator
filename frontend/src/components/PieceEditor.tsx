@@ -11,7 +11,7 @@ import { api } from "../App"
 import { moveGridToMap } from './utils'
 import { chessStore, updatePieces } from "../store";
 import { ImplementationSandbox } from "./ImplementationSandbox";
-import { CANCEL_MOVE_PK } from './definitions'
+export const CANCEL_MOVE_PK = "CANCEL"
 
 const initMoveGrid: MoveGrid = Array.from({ length: 15 }).map(() => {
   return Array.from({ length: 15 }).map(() => {

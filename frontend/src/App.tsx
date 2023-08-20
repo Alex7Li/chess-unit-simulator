@@ -1,10 +1,11 @@
-import React, { FC, useEffect, useState, createContext, useReducer } from 'react';
+import React, { FC, useEffect, useState, createContext, useReducer, useRef } from 'react';
 import { Tabs, Alert } from 'flowbite-react';
 import BoardEditorView from './components/BoardEditor';
 import { HelpModal } from './components/HelpModal'
 import { MoveEditor } from './components/MoveEditor'
 import PieceEditor from './components/PieceEditor';
-import { Lobby } from './components/Lobby';
+import { LobbyView } from './components/LobbyView';
+import { createLobbySocket } from './components/Lobby';
 import Login from './components/Login'
 import { ExclamationCircleIcon, BellAlertIcon } from '@heroicons/react/24/outline'
 import { chessStore, setMouseDownState } from './store';
@@ -14,18 +15,15 @@ import { API_URL } from './components/definitions';
 import { isYourMove } from './components/utils';
 
 
-// IF DJANGO STARTS giving OPTION calls instead of GET/POST and all the
-// requests are failing: turn your computer off and on again. IDK why
-// but this works and nothing else I tried does. Happened twice.
-// Simply restart (not power off and then turn on) didn't work
-
-
 const csrf_token: String = document.querySelector('[name=csrfmiddlewaretoken]')!.value;
 
 export const api = axios.create({
     baseURL: API_URL,
-    timeout: 1000,
-    headers: {'X-CSRFToken': csrf_token}
+    timeout: 10000,
+    data: {
+     'csrfmiddlewaretoken': csrf_token  
+    },
+    headers: {'X-CSRFToken': csrf_token }
 });
 
 //https://reactjs.org/docs/code-splitting.html#reactlazy
@@ -43,13 +41,14 @@ api.interceptors.response.use((response) => {
     throw error;
   });
 // expose some data for debugging
-window.api = api
-window.chessStore = chessStore
+// window.api = api
+// window.chessStore = chessStore
 
 const App: FC = () => {
   const onMouseDown: React.MouseEventHandler<HTMLDivElement> = (e) => setMouseDownState(e.button)
   const message = chessStore((state) => state.errorMessage);
   const games = chessStore((state) => state.games);
+  const lobby = useRef(createLobbySocket())
 
   const message_jsx = <Alert
     color="failure"
@@ -81,7 +80,7 @@ const App: FC = () => {
         className='m-0 p-0'
       >
         <Tabs.Item  active={false} title={<div className='inline-flex'>Lobby<HelpModal
-          text="Lobby to create games and join games made by other players."/></div>}><Lobby></Lobby></Tabs.Item>
+          text="Lobby to create games and join games made by other players."/></div>}><LobbyView lobby={lobby}></LobbyView></Tabs.Item>
         {
           games.map((game, idx) => {
             let title = <span>{game.boardName}</span>

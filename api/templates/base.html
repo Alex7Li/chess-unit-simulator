@@ -7,6 +7,8 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>Vite App</title>
   <link rel="icon" type="image/svg+xml" href="/static/favicon.svg" />
+  {% if debug %}
+  <script type="module" src="http://localhost:5173/@vite/client"></script>
   <!-- If you're using vite with React, this next script will be needed for HMR -->
   <script type="module">
     import RefreshRuntime from 'http://localhost:5173/@react-refresh'
@@ -17,20 +19,17 @@
       window.__vite_plugin_react_preamble_installed__ = true
     }
   </script>
-
-  {% if debug %}
-  <script type="module" src="http://localhost:5173/@vite/client"></script>
   {% endif %}
   {% csrf_token %}
 </head>
 
 <body>
-  <div id="root"></div>
-  {% if debug %}
-  <script type="module" src="http://localhost:5173/src/main.tsx"></script>
-  {% else %}
-  {% render_vite_bundle %}
-  {% endif %}
+  <div id="root"> </div>
+    {% if debug %}
+    <script type="module" src="http://localhost:5173/src/main.tsx"></script>
+    {% else %}
+    {% render_vite_bundle %}
+    {% endif %}
 </body>
 
 </html>

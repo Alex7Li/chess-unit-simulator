@@ -34,7 +34,7 @@ class LobbyConsumer(WebsocketConsumer):
         deleted_ids = []
         for request in open_requests:
             request.delete()
-            deleted_ids.append(request.pk)
+            deleted_ids.append(str(request.pk))
 
         # Let the world know about the deletions
         async_to_sync(self.channel_layer.group_send)(
@@ -63,7 +63,7 @@ class LobbyConsumer(WebsocketConsumer):
             return
         if type == 'request_game':
             board_pk = data_json["board_pk"]
-            board_setup = BoardSetup.objects.get(('pk', board_pk))
+            board_setup = BoardSetup.objects.get(('pk', int(board_pk)))
             try:
                 request = GameRequest(requesting_user=requesting_user, board_setup=board_setup)
                 request.full_clean()
@@ -73,7 +73,6 @@ class LobbyConsumer(WebsocketConsumer):
                 for board_piece_loc in board_piece_locs:
                     piece_set.add(board_piece_loc.piece)
                 piece_pk_map = {
-                    # int is not allowed for map keys in json data sometimes
                     str(piece.pk): PieceSerializer(piece).data for piece in piece_set
                     }
                 gameRequest = GameRequestSerializer(request).data
@@ -90,7 +89,7 @@ class LobbyConsumer(WebsocketConsumer):
                     "event_type": "fail"
                     }))
         elif type == 'accept_game':
-            pk = data_json['request_pk']
+            pk = int(data_json['request_pk'])
             try:
                 accepted_request = GameRequest.objects.get(('pk', pk))
                 accepted_request.delete()
@@ -105,7 +104,7 @@ class LobbyConsumer(WebsocketConsumer):
                     self.group_name, {
                         "type": "send_to_socket",
                         "event_type": "begin_game",
-                        "deleted_ids": [pk],
+                        "deleted_ids": [str(pk)],
                         "game_data": GameSerializer(new_game).data,
                         "game_name": accepted_request.board_setup.name
                     }
@@ -138,7 +137,7 @@ class GameConsumer(WebsocketConsumer):
     def disconnect(self, close_code):
         if close_code == 1000:
             try:
-                Game.objects.get(pk=self.game_id).delete()
+                Game.objects.get(pk=int(self.game_id)).delete()
             except Game.DoesNotExist:
                 pass # already removed
 
@@ -155,7 +154,7 @@ class GameConsumer(WebsocketConsumer):
         try:
             event_type = text_data_json['event_type']
             try:
-                game = Game.objects.get(pk=self.game_id)
+                game = Game.objects.get(pk=int(self.game_id))
             except Game.DoesNotExist:
                 self.send(text_data=json.dumps({
                     "message": "This game has already ended",

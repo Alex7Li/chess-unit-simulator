@@ -5,6 +5,9 @@ Example usage:
   <ImplementationSandbox onCodeChange={()=>{}} divId="SOME_STRING"/>
 </div>
 */
+import 'blockly/blocks_compressed'
+
+
 import React, {FC, useEffect} from "react";
 import {Blockly, chessTheme} from '../blockly';
 // @ts-ignore
@@ -234,7 +237,7 @@ export const ImplementationSandbox: FC<ImplementationSandboxProps> = ({onCodeCha
     onVisible(blocklyDiv, onResize);
 
     const createFlyout = function(workspace: Blockly.WorkspaceSvg) {
-      let xmlList = [];
+      let xmlList: HTMLButtonElement[] = [];
       // Add your button and give it a callback name.
       const button = document.createElement('button');
       button.setAttribute('text', 'Create Typed Variable');

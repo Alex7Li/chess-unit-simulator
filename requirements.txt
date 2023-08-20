@@ -1,8 +1,11 @@
 channels[daphne]
 channels_redis
-django
+django==4.2.*
 djangorestframework
+django-cockroachdb==4.2.*
 django-cors-headers
+django-debug-toolbar
+dj-database-url
 func-timeout
 load_dotenv
 pillow
@@ -10,5 +13,5 @@ psycopg2-binary
 service-identity
 random-username
 requests
+whitenoise
 wonderwords
-

@@ -12,6 +12,8 @@ import { Blockly, pythonGenerator } from '../blockly';
 
 import { chessStore, updateMoves } from "../store";
 
+const UNMADE_MOVE_PK = "UNMADE"
+
 interface MoveEditorProps {
 
 }
@@ -23,7 +25,7 @@ const newMoveTemplate: Move = {
   "color": [_.random(0, 255), _.random(0, 255), _.random(0, 255)],
   "implementation": null,
   "symbol": "",
-  "pk": -2,
+  "pk": UNMADE_MOVE_PK,
 }
 interface MoveSelectModalProps {
   setSelectedMove: (move: Move) => void
@@ -97,7 +99,7 @@ export const MoveEditor: FC<MoveEditorProps> = ({ }) => {
     }
     setSaveStatus('saving')
     if(edit == false) {
-      move.pk = -2
+      move.pk = "DNE" // A PK that does not exist, to force the creation of a new move
     }
     api.post("/moves", {}, {
       params: {
@@ -185,7 +187,7 @@ export const MoveEditor: FC<MoveEditorProps> = ({ }) => {
     </div>
     <div className='inline-flex'>
       <Button onClick={()=>saveMove(false)}>Save as new move</Button>
-      {move.pk == -2 ? <></> : <Button onClick={()=>saveMove(true)}>Overwrite existing move</Button>}
+      {move.pk == UNMADE_MOVE_PK ? <></> : <Button onClick={()=>saveMove(true)}>Overwrite existing move</Button>}
       <SaveElement savingState={saveStatus} />
       <MoveSelectModal setSelectedMove={setSelectedMove}/>
       <ViewCodeModal pythonCode={pythonCode}/>

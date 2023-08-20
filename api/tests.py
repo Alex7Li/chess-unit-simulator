@@ -22,6 +22,7 @@ from api.routing import websocket_urlpatterns
 image_bytes = 'data:image/png;base64,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'
 move_implementation = {"blocks": {"languageVersion": 0, "blocks": [{"type": "chess_action", "id": "`8DRg_aD7uEOo{L?xIXd", "x": 137, "y": 52, "inputs": {"ACTION": {"block": {"type": "teleport", "id": "S5kX9!cc`[Weq+@;23GT", "inputs": {"FROM_UNIT": {"block": {"type": "acting_unit", "id": "8IZ.zuq_o3fB_EYrd|r5"}}, "TO_TILE": {"block": {"type": "targeted_tile", "id": "^!!!^cr){Mn?=xSH#6Ao"}}}}}}}]}}
 MOCK_MEDIA_ROOT = tempfile.mkdtemp()
+TIMEOUT_SEC = 1
 
 class AuthWebsocketCommunicator(WebsocketCommunicator):
     def __init__(self, path, headers=None, subprotocols=None, user=None):
@@ -199,16 +200,16 @@ class LobbyConsumerTest(TestCaseWithMockData):
     async def test_lobby_consumer(self):
         communicator_wolf = AuthWebsocketCommunicator("/ws/lobby/", user=self.wolf_user)
         communicator_dan = AuthWebsocketCommunicator("/ws/lobby/", user=self.dan_user)
-        connected, _ = await communicator_dan.connect()
+        connected, _ = await communicator_dan.connect(TIMEOUT_SEC)
         assert connected
-        connected, _ = await communicator_wolf.connect()
+        connected, _ = await communicator_wolf.connect(TIMEOUT_SEC)
         assert connected
         # 1) Dan requests a new game
         await communicator_dan.send_json_to({
             'event_type': 'request_game',
             'board_pk': self.sample_board.pk
         })
-        response = await communicator_dan.receive_from()
+        response = await communicator_dan.receive_from(TIMEOUT_SEC)
         response_json = json.loads(response)
         request_pk = response_json['request']['pk']
         assert response_json['event_type'] == 'new_game'
@@ -217,7 +218,7 @@ class LobbyConsumerTest(TestCaseWithMockData):
         assert response_json['request']['board_setup']['pk'] == self.sample_board.pk
         assert len(response_json['pieces']) == 2
         # 2) wolf sees that the game is posted
-        wolf_alert = await communicator_wolf.receive_from()
+        wolf_alert = await communicator_wolf.receive_from(TIMEOUT_SEC)
         response_json = json.loads(wolf_alert)
         assert response_json['event_type'] == 'new_game'
         assert response_json['request']['requesting_user'] == 'dan'
@@ -229,7 +230,7 @@ class LobbyConsumerTest(TestCaseWithMockData):
             'event_type': 'accept_game',
             'request_pk':  request_pk
         })
-        wolf_alert = await communicator_wolf.receive_from()
+        wolf_alert = await communicator_wolf.receive_from(TIMEOUT_SEC)
         response_json = json.loads(wolf_alert)
         assert response_json['event_type'] == 'begin_game'
         assert response_json['deleted_ids'] == [request_pk]
@@ -239,12 +240,12 @@ class LobbyConsumerTest(TestCaseWithMockData):
             'event_type': 'accept_game',
             'request_pk':  request_pk
         })
-        wolf_alert = await communicator_wolf.receive_from()
+        wolf_alert = await communicator_wolf.receive_from(TIMEOUT_SEC)
         response_json = json.loads(wolf_alert)
         assert response_json['event_type'] == 'fail'
         assert response_json['message'] != ""
         # 5) Dan learns that wolf has joined the game
-        dan_alert = await communicator_dan.receive_from()
+        dan_alert = await communicator_dan.receive_from(TIMEOUT_SEC)
         response_json = json.loads(dan_alert)
         assert response_json['event_type'] == 'begin_game'
         assert response_json['deleted_ids'] == [request_pk]
@@ -262,9 +263,9 @@ class GameConsumerTest(TestCaseWithMockData):
         game_pk = self.sample_game.pk
         communicator_wolf = AuthWebsocketCommunicator(f"/ws/game/{game_pk}/", user=self.wolf_user)
         communicator_dan = AuthWebsocketCommunicator(f"/ws/game/{game_pk}/", user=self.dan_user)
-        connected, _ = await communicator_dan.connect()
+        connected, _ = await communicator_dan.connect(TIMEOUT_SEC)
         assert connected
-        connected, _ = await communicator_wolf.connect()
+        connected, _ = await communicator_wolf.connect(TIMEOUT_SEC)
         
         await communicator_wolf.send_json_to({
             'from_loc': [0, 0],
@@ -272,11 +273,11 @@ class GameConsumerTest(TestCaseWithMockData):
             'event_type': 'move'
         })
         # One move as white
-        wolf_alert = await communicator_wolf.receive_from()
+        wolf_alert = await communicator_wolf.receive_from(TIMEOUT_SEC)
         response_json = json.loads(wolf_alert)
         response_json['whoami'] = 'dan'
         assert response_json['event_type'] == 'board_update'
-        dan_alert = await communicator_dan.receive_from()
+        dan_alert = await communicator_dan.receive_from(TIMEOUT_SEC)
         assert json.loads(dan_alert) == response_json
         board = response_json['game_data']['game_state']['board']
         assert len(board) == 64
@@ -291,8 +292,8 @@ class GameConsumerTest(TestCaseWithMockData):
             'from_loc': [3, 0],
             'to_loc': [2, 0]
         })
-        dan_alert = await communicator_dan.receive_from()
-        wolf_alert = await communicator_wolf.receive_from()
+        dan_alert = await communicator_dan.receive_from(TIMEOUT_SEC)
+        wolf_alert = await communicator_wolf.receive_from(TIMEOUT_SEC)
         response_json = json.loads(wolf_alert)
         response_json['whoami'] = 'dan'
         assert json.loads(dan_alert) == response_json
@@ -305,7 +306,7 @@ class GameConsumerTest(TestCaseWithMockData):
             'from_loc': [1, 0],
             'to_loc': [2, 0]
         })
-        wolf_alert = await communicator_wolf.receive_from()
+        wolf_alert = await communicator_wolf.receive_from(TIMEOUT_SEC)
         response_json = json.loads(wolf_alert)
         assert response_json['event_type'] == "invalid_move"
 

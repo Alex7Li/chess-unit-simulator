@@ -4,7 +4,7 @@ import { FaceSmileIcon } from '@heroicons/react/24/outline'
 import _ from 'lodash'
 import MoveIcon from './MoveIcon'
 import { chessStore } from "../store";
-import { CANCEL_MOVE_PK } from "./definitions";
+import { CANCEL_MOVE_PK } from "./PieceEditor";
 interface PieceViewProps {
   piece: Piece
 }

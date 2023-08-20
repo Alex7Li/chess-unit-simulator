@@ -1,7 +1,6 @@
 import React, {FC, useState} from "react";
 import _ from 'lodash'
-import { MoveGrid, BoardSetup, Game } from './types'
-import { DjangoMoveMap } from "../networking";
+import { DjangoMoveMap, MoveGrid, BoardSetup, Game } from './types'
 import { chessStore } from '../store'
 export type SaveState ='saving'|'fail'|'ok' 
 

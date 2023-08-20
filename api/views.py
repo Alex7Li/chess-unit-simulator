@@ -4,14 +4,13 @@ from django.utils.decorators import method_decorator
 from django.db.utils import IntegrityError
 from rest_framework.views import APIView
 from rest_framework.response import Response
-from rest_framework import authentication, permissions, status
+from rest_framework import status
 
 from api.models import Move, Piece, to_color_string, PieceSerializer, MoveSerializer, \
-    BoardSetup, BoardSetupSerializer, GameRequest, GameRequestSerializer, make_random_username, \
+    BoardSetup, BoardSetupSerializer, GameRequest, GameRequestSerializer, \
     GameSerializer, Game
 import json
 from django.contrib.auth.models import User
-from django.contrib.auth import authenticate, login, logout
 # Create your views here.
 from django.http import HttpResponse
 from django.core.exceptions import ValidationError
@@ -46,61 +45,18 @@ def make_user(username, password, email, guest_account: bool):
 
 class Users(APIView):
     def get(self, request):
+        if not request.session.session_key:
+            request.session.create()
         if request.user.is_authenticated:
             return Response(data={"username": request.user.username}, status=status.HTTP_200_OK)
         else:
             return Response(data={"username": ""}, status=status.HTTP_200_OK)
 
-    def post(self, request):
-        type = request.query_params.get('type')
-        if type == "guest_signup":
-            tries = 0
-            while True:
-                username = make_random_username(emoji_mode=False)
-                if len(User.objects.filter(username=username)) == 0:
-                    break # Found a new username
-                tries += 1
-                if tries > 10:
-                    return ResponseWithMessage("Failed to generate a guest username!", status=status.HTTP_400_BAD_REQUEST)
-            try:
-                user = make_user(username, "", "", True)
-                login(request, user)
-                return Response(status=status.HTTP_200_OK)
-            except (ValidationError, IntegrityError) as e:
-                return ResponseWithMessage(str(e), status=status.HTTP_400_BAD_REQUEST)
-        elif type == "signup":
-            username = request.query_params.get('username')
-            password = request.query_params.get('password')
-            email = request.query_params.get('email')
-            try:
-                user = make_user(username, password, email, False)
-                login(request, user)
-                return Response(status=status.HTTP_200_OK)
-            except (ValidationError, IntegrityError) as e:
-                return ResponseWithMessage(str(e), status=status.HTTP_400_BAD_REQUEST)
-        elif type == "login":
-            username = request.query_params.get('username')
-            password = request.query_params.get('password')
-            if password == None or username == None:
-                return ResponseWithMessage("No username or password given", status=status.HTTP_400_BAD_REQUEST)
-            try:
-                user = User.objects.get(username=username)
-            except User.DoesNotExist:
-                return ResponseWithMessage("Username not found", status=status.HTTP_401_UNAUTHORIZED)
-            correct_password = user.check_password(password)
-            if not correct_password:
-                return ResponseWithMessage("Incorrect password", status=status.HTTP_401_UNAUTHORIZED)
-            user = authenticate(request, username=username, password=password)
-            if user is not None:
-                login(request, user)
-                return Response(status=status.HTTP_200_OK)
-            else:
-                # should never happen
-                return ResponseWithMessage("Invalid credentials", status=status.HTTP_401_UNAUTHORIZED)
-        elif type == "logout":
-            logout(request)
-            return Response(status=status.HTTP_200_OK)
-        return ResponseWithMessage("Invalid post request type", status=status.HTTP_400_BAD_REQUEST)
+    # There was a post request here.
+    # Caused endless pain and suffering and still doesn't work,
+    # don't try todo login with a SPA, use another page.
+    # Using https://learndjango.com/tutorials/django-login-and-logout-tutorial
+    # for the auth
 
 class Moves(APIView):
     """
@@ -124,7 +80,9 @@ class Moves(APIView):
             return ResponseWithMessage("You must be logged in to save", status=status.HTTP_401_UNAUTHORIZED)
         user = User.objects.get(id=request.user.id)
         try:
-            move = Move.objects.get(pk=move_query['pk'])
+            if move_query['pk'] == "DNE":
+                raise Move.DoesNotExist # create intead of edit
+            move = Move.objects.get(pk=int(move_query['pk']))
             if user != move.author:
                 return ResponseWithMessage("Cannot modify this move as someone else created it.", status=status.HTTP_401_UNAUTHORIZED)
             move.color = to_color_string(move_query['color'])
@@ -286,7 +244,7 @@ class GameRequests(APIView):
 class Games(APIView):
     def get(self, request, format=None):
         if not request.user.is_authenticated:
-            return ResponseWithMessage("You must be logged in to play. Sorry, implementing features for guests is currently low priority.", status=status.HTTP_401_UNAUTHORIZED)
+            return ResponseWithMessage("You must be logged in to play.", status=status.HTTP_401_UNAUTHORIZED)
         white_games = Game.objects.filter(white_user=request.user)
         black_games = Game.objects.filter(black_user=request.user)
         played_games = white_games.union(black_games)

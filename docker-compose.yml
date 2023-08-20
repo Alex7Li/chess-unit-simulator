@@ -5,13 +5,15 @@ services:
       dockerfile: convert_code.Dockerfile
     container_name: convert-code
     ports:
-      - "3334:3334"
+      - "3333:3333"
     expose:
-      - "3334"
+      - "3333"
   redis:
     image: redis:7.2-rc2-alpine
     ports:
-      - "6380:6380"
+      - "6379:6379"
+    expose:
+      - "6379"
   # postgres:
   #   image: postgres
   #   ports:
@@ -20,7 +22,7 @@ services:
   #     - "5432"
   #   env_file:
   #     - .env
-    restart: always
+  #   restart: always
   adminer:
     image: adminer
     restart: always
@@ -34,13 +36,13 @@ services:
     ports:
       - "8000:8000"
     environment:
+      - BACKEND_HOST=backend
+      - BACKEND_PORT=8000
       - REDIS_HOST=redis
-      - REDIS_PORT=6380
+      - REDIS_PORT=6379
       - CODE_CONVERT_HOST=convert-code-server
       - CODE_CONVERT_PORT=3334
     depends_on:
       - redis
-      - postgres
       - convert-code-server
-    # command: ["ls"]
  

@@ -28,6 +28,10 @@ __pycache__
 secret_key.txt
 media/pieces
 
+db.sqlite
 db.sqlite3
 .env
 .my_pgpass
+
+static/assets
+static/manifest.json

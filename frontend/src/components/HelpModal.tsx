@@ -1,5 +1,5 @@
 
-import React, {FC, useState} from 'react'
+import React, {FC, useState, useCallback, useEffect} from 'react'
 import _ from 'lodash'
 import { Modal, Tabs } from 'flowbite-react'
 import { InformationCircleIcon } from '@heroicons/react/24/outline'
@@ -9,6 +9,25 @@ interface HelpModalProps {
 }
 export const HelpModal: FC<HelpModalProps> = ({text}) => {
   const [isShown, setShown] = useState<boolean>(false);
+  const KEY_NAME_ESC = 'Escape';
+  const KEY_EVENT_TYPE = 'keyup';
+ 
+  function useEscapeKey(handleClose) {
+      const handleEscKey = useCallback((event) => {
+      if (event.key === KEY_NAME_ESC) {
+        setShown(false);
+      }
+    }, [handleClose]);
+  
+    useEffect(() => {
+      document.addEventListener(KEY_EVENT_TYPE, handleEscKey, false);
+  
+      return () => {
+        document.removeEventListener(KEY_EVENT_TYPE, handleEscKey, false);
+      };
+    }, [handleEscKey]);
+  }
+  useEscapeKey(()=>setShown(false))
   return <div>
   <div onClick={() => setShown(true)} className="h-5 w-5">
   <i><InformationCircleIcon/></i>

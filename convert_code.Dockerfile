@@ -1,5 +1,5 @@
 # https://docs.docker.com/language/nodejs/build-images/
-FROM node:20-alpine3.17
+FROM node:18-alpine3.17
 ENV NODE_ENV=production
 WORKDIR /frontend
 COPY ["frontend/package_convert_code_server.json", "./package.json"]
